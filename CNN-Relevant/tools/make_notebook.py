@@ -24,7 +24,7 @@ md("""
 <img src="data:image/png;base64,{diagram}" alt="network flow" width="100%">
 
 - **Input**: one trading day (78 five-minute bars) drawn as a 234×234 OHLC + volume chart.
-- **Models**: `plain` (Jiang–Kelly–Xiu style, top) and `residual` (blocks 2–3 become ResNet basic blocks with a skip connection, bottom).
+- **Models**: `plain` (Jiang–Kelly–Xiu style, top) and `residual` (blocks 2–3 become ResNet basic blocks with a skip connection, bottom), plus `series1d`: a 1D CNN fed the same windows as raw OHLCV numbers (no image), to test whether the picture itself helps.
 - **Targets**: `vol_h1` (is the next bar's move larger than usual?) and `xsdir_h12` (does the stock beat the cross-sectional median over the next hour?).
 - **Benchmarks**: training prior, simple rules, gradient-boosted trees on hand-made features.
 - **Code**: all logic lives in `chartcnn/` next to this notebook; cells only configure, run and plot.
@@ -80,7 +80,7 @@ EXPERIMENTS = [
     dict(name="vol_h1", target="vol", horizon=1),                    # sanity check: signal is known to exist
     dict(name="xsdir_h12", target="xs_dir", horizon=12, stride=12),  # 1-hour relative direction; stride =
 ]                                                                    # horizon so labels do not overlap
-ARCHS = ["plain", "residual"]                     # every experiment is trained once per architecture
+ARCHS = ["plain", "residual", "series1d"]         # image CNN, image ResNet, 1D CNN on raw OHLCV (no image)
 RESUME, RUN_ID = False, "local_smoke" if LOCAL_TEST else datetime.now(timezone.utc).strftime("run_%Y%m%d_%H%M%S")
 RUN_DRIVE, RUN_LOCAL = DRIVE / "runs" / RUN_ID, LOCAL / "run"
 if RESUME:
@@ -92,12 +92,13 @@ save_json(RUN_LOCAL / "settings.json", dict(settings=SETTINGS, experiments=EXPER
 print("results ->", RUN_DRIVE)
 """)
 
-md("## 3. Models\nLayer-by-layer output shapes and parameter counts for both architectures. Output layers start at zero, so every initial prediction is exactly 0.5.")
+md("## 3. Models\nLayer-by-layer output shapes and parameter counts for every architecture. Output layers start at zero, so every initial prediction is exactly 0.5.")
 code("""
 store = chartcnn.Store(PREPARED)
 sample, _ = chartcnn.build_split(store, "train", "vol", 1, SETTINGS["stride"])
-x = torch.stack([chartcnn.ChartDataset(PREPARED, sample.head(4))[i][0] for i in range(4)])
 for arch in ARCHS:
+    data = chartcnn.make_dataset(PREPARED, sample.head(4), arch)
+    x = torch.stack([data[i][0] for i in range(4)])
     model = chartcnn.build_model(dict(SETTINGS, arch=arch))
     table, total, trainable = chartcnn.parameter_table(model)
     print(f"{arch}: {total:,} parameters ({trainable:,} trainable)")
@@ -177,6 +178,8 @@ md("## 8. Frame correlation (model)\nSame anchors as section 4, now seen through
 code("""
 trained = {}
 for key in RESULTS:
+    if chartcnn.INPUT_KIND[key.rsplit("_", 1)[1]] != "image":
+        continue                                  # frame similarity is defined on images
     m = chartcnn.build_model(dict(SETTINGS, arch=key.rsplit("_", 1)[1]))
     m.load_state_dict(torch.load(RUN_LOCAL / key / "best.pt", map_location="cpu", weights_only=False)["model"])
     chartcnn.print_parameter_count(m, key)

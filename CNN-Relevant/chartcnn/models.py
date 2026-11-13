@@ -32,6 +32,10 @@ class ResidualBlock(nn.Module):
         return self.pool(self.act(self.main(x) + self.shortcut(x)))
 
 
+INPUT_KIND = {"plain": "image", "residual": "image", "series1d": "series"}
+SERIES_CHANNELS = (128, 256, 384)       # wider than the image CNN so parameter counts are close
+
+
 class ChartCNN(nn.Module):
     """
     arch="plain"    (Jiang-Kelly-Xiu style)
@@ -52,7 +56,7 @@ class ChartCNN(nn.Module):
         super().__init__()
         if arch not in ("plain", "residual"):
             raise ValueError("arch must be 'plain' or 'residual'")
-        self.arch = arch
+        self.arch, self.input_shape = arch, (1, *input_hw)
         layers, c_in = [], 1
         for i, c_out in enumerate(channels):
             if i == 0:
@@ -94,15 +98,56 @@ class ChartCNN(nn.Module):
         return self.head(self.features(self._on_my_device(x)))
 
 
+class SeriesCNN1D(nn.Module):
+    """1D CNN on the raw OHLCV sequence: the image CNN's counterpart without the picture.
+
+        input (5, 78): open, high, low, close, volume, scaled exactly as the chart is
+        Block i : Conv1d(k=5) -> BatchNorm -> LeakyReLU          (time length stays 78)
+        Head    : Flatten -> Dropout -> Linear(2)
+
+    Same depth as the image CNN, no pooling over time (the image CNN keeps its 78 bar columns
+    too), and channels widened so the parameter count is close to the plain image CNN.
+    """
+
+    def __init__(self, channels=SERIES_CHANNELS, dropout=0.5, length=78, n_inputs=5):
+        super().__init__()
+        self.arch, self.input_shape = "series1d", (n_inputs, length)
+        layers, c_in = [], n_inputs
+        for c_out in channels:
+            layers += [nn.Conv1d(c_in, c_out, 5, padding=2), nn.BatchNorm1d(c_out), nn.LeakyReLU(0.01)]
+            c_in = c_out
+        self.features = nn.Sequential(*layers)
+        self.flat_features = c_in * length
+        self.head = nn.Sequential(nn.Flatten(), nn.Dropout(dropout), nn.Linear(self.flat_features, 2))
+        for m in self.modules():
+            if isinstance(m, (nn.Conv1d, nn.Linear)):
+                nn.init.xavier_uniform_(m.weight)
+                nn.init.zeros_(m.bias)
+        nn.init.zeros_(self.head[-1].weight)       # start at P = 0.5, like the image CNN
+
+    def _on_my_device(self, x):
+        return x.to(self.head[-1].weight.device, non_blocking=True)
+
+    def embed(self, x):
+        return self.features(self._on_my_device(x)).flatten(1)
+
+    def forward(self, x):
+        return self.head(self.features(self._on_my_device(x)))
+
+
 def build_model(settings):
+    arch = settings.get("arch", "plain")
+    if arch == "series1d":
+        return SeriesCNN1D(channels=tuple(settings.get("series_channels", SERIES_CHANNELS)),
+                           dropout=settings["dropout"])
     return ChartCNN(channels=tuple(settings["channels"]), dropout=settings["dropout"],
-                    head_height=settings["head_height"], arch=settings.get("arch", "plain"))
+                    head_height=settings["head_height"], arch=arch)
 
 
-def parameter_table(model, input_hw=(234, 234)):
+def parameter_table(model):
     """Per-layer output shape and parameter count, plus the total (advisor rule: always report)."""
     device = next(model.parameters()).device            # works for CPU and GPU models alike
-    rows, x, was_training = [], torch.zeros(1, 1, *input_hw, device=device), model.training
+    rows, x, was_training = [], torch.zeros(1, *model.input_shape, device=device), model.training
     model.eval()
     with torch.no_grad():
         for name, layer in list(model.features.named_children()) + [("head." + n, l) for n, l in model.head.named_children()]:

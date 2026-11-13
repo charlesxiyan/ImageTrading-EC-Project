@@ -8,7 +8,7 @@ import torch
 from torch import nn
 
 from .baselines import fit_baselines
-from .data import ChartDataset, Store, build_split
+from .data import Store, build_split, make_dataset
 from .evaluation import comparison_table, decile_report, metrics
 from .models import build_model, print_parameter_count
 from .utils import make_loader, mirror, save_json, seed_all
@@ -107,10 +107,10 @@ def run_experiment(prepared, exp, settings, device, out_dir, drive_dir=None, smo
                                      max_train=2_000 if smoke else 300_000)
 
     model = build_model(settings).to(device)
-    print_parameter_count(model, f"ChartCNN ({settings.get('arch', 'plain')})")
+    print_parameter_count(model, f"model ({settings.get('arch', 'plain')})")
     w = settings["num_workers"]
-    train_loader = make_loader(ChartDataset(prepared, train), settings["batch_size"], w, True, settings["seed"])
-    valid_loader = make_loader(ChartDataset(prepared, valid), settings["eval_batch_size"], w, False)
+    train_loader = make_loader(make_dataset(prepared, train, settings.get("arch", "plain")), settings["batch_size"], w, True, settings["seed"])
+    valid_loader = make_loader(make_dataset(prepared, valid, settings.get("arch", "plain")), settings["eval_batch_size"], w, False)
     history = fit(model, train_loader, valid_loader, valid.label.to_numpy(), prior, settings, device,
                   out_dir, drive_dir)
 
@@ -136,7 +136,7 @@ def evaluate_test(prepared, exp, settings, device, out_dir, median, prior, drive
         test = test.reset_index(drop=True)
     model = build_model(settings).to(device)
     model.load_state_dict(torch.load(Path(out_dir) / "best.pt", map_location=device, weights_only=False)["model"])
-    p = predict(model, make_loader(ChartDataset(prepared, test), settings["eval_batch_size"],
+    p = predict(model, make_loader(make_dataset(prepared, test, settings.get("arch", "plain")), settings["eval_batch_size"],
                                    settings["num_workers"], False), device)
     result = dict(experiment=exp, test=metrics(test.label.to_numpy(), p, prior),
                   long_short=decile_report(test, p, exp["target"])[1])

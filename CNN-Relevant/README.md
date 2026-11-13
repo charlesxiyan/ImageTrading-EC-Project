@@ -1,6 +1,6 @@
 # CNN-Relevant
 
-Chart-image CNN for 5-minute US equity bars (Jiang–Kelly–Xiu style), plus a ResNet-style variant.
+Chart-image CNN for 5-minute US equity bars (Jiang–Kelly–Xiu style), a ResNet-style variant, and a 1D CNN on the raw OHLCV numbers to test whether the image itself helps.
 
 ![network flow](assets/network_flow.png)
 
@@ -36,3 +36,4 @@ Chart-image CNN for 5-minute US equity bars (Jiang–Kelly–Xiu style), plus a 
 |---|---|---|
 | `plain` | Conv 5×3 → BN → LeakyReLU → MaxPool 2×1 | 776,450 |
 | `residual` | [Conv → BN → LReLU → Conv → BN] + 1×1 skip → LReLU → MaxPool 2×1 | 2,047,362 |
+| `series1d` | No image: the same 78-bar window as a (5, 78) OHLCV sequence, scaled like the chart; 3 × [Conv1d k=5 → BN → LeakyReLU] (128/256/384 channels) → Linear | 720,770 |
