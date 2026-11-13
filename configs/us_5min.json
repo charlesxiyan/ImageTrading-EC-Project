@@ -1,0 +1,35 @@
+{
+  "data_root": "~/Market Data/demo_2023_h1_dividend_adjusted",
+  "artifact_root": "artifacts/cnn78u_5min_h1",
+  "bar_minutes": 5,
+  "lookback": 78,
+  "horizon": 1,
+  "stride": 1,
+  "include_volume": true,
+  "allow_cross_session": true,
+  "zero_return_epsilon": 0.0,
+  "train_end": "2023-03-31",
+  "validation_end": "2023-04-30",
+  "seed": 69,
+  "training": {
+    "epochs": 5,
+    "batch_size": 32,
+    "learning_rate": 0.001,
+    "weight_decay": 0.0001,
+    "validate_every_batches": 0,
+    "patience_checks": 5,
+    "num_workers": 0,
+    "device": "auto"
+  },
+  "model": {
+    "name": "CNN78u",
+    "channels": [
+      32,
+      64,
+      128,
+      256
+    ],
+    "pool_grid": 4,
+    "dropout": 0.5
+  }
+}

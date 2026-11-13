@@ -1,0 +1,16 @@
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+.ipynb_checkpoints/
+.DS_Store
+
+# Data, run outputs and weights stay local (licensed WRDS/TAQ data must never be committed)
+data/
+artifacts/
+*.parquet
+*.pt
+*.pth
+*.ckpt
+*.zip
+colab/_local_validation/
