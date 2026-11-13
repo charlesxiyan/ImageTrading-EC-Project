@@ -97,6 +97,18 @@ def build_split(store, split, target, horizon, stride, train_abs_median=None):
     return f.reset_index(drop=True), train_abs_median
 
 
+def scale_like_image(window):
+    """(L, 5) OHLCV -> (5, L) float32 with exactly the scaling the chart uses:
+    prices mapped to [0, 1] by the window's lowest low and highest high, volume divided by the
+    window's maximum volume. A 1D model therefore sees the same information as the image,
+    minus the drawing (see DECISIONS: a 1D baseline must use the same per-window scaling)."""
+    x = np.asarray(window, dtype=np.float64)
+    low, high = x[:, 2].min(), x[:, 1].max()
+    prices = (x[:, :4] - low) / (high - low) if high > low else np.full((len(x), 4), 0.5)
+    volume = x[:, 4:5] / x[:, 4].max()
+    return np.concatenate([prices, volume], axis=1).T.astype(np.float32)
+
+
 class ChartDataset(Dataset):
     """Renders chart images on the fly from the memory-mapped bundle."""
 
@@ -116,14 +128,31 @@ class ChartDataset(Dataset):
         state["_x"] = state["_m"] = None
         return state
 
-    def image(self, i):
+    def window(self, i):
+        """The raw (78, 5) OHLCV window ending at the decision bar, on a prediction-time basis."""
         if self._x is None:
             self._x = np.load(self.root / "features.npy", mmap_mode="r")
             self._m = np.load(self.root / "multipliers.npy", mmap_mode="r")
         s, t = self.s[i], self.t[i]
-        window = prediction_basis(self._x[s, t - LOOKBACK + 1:t + 1], self._m[s, t])
-        return render_window(window, self.include_volume)
+        return prediction_basis(self._x[s, t - LOOKBACK + 1:t + 1], self._m[s, t])
+
+    def image(self, i):
+        return render_window(self.window(i), self.include_volume)
 
     def __getitem__(self, i):
         x = torch.from_numpy(self.image(i).astype(np.float32)[None] / 255.0)   # [1, 234, 234] in [0, 1]
         return x, int(self.y[i]), int(i)
+
+
+class SeriesDataset(ChartDataset):
+    """Same samples and windows as ChartDataset, but returns the numbers instead of the
+    picture: a (5, 78) tensor of open, high, low, close and volume (see scale_like_image)."""
+
+    def __getitem__(self, i):
+        return torch.from_numpy(scale_like_image(self.window(i))), int(self.y[i]), int(i)
+
+
+def make_dataset(prepared, frame, arch):
+    """The dataset an architecture expects: chart images, or raw OHLCV sequences."""
+    from .models import INPUT_KIND
+    return (SeriesDataset if INPUT_KIND[arch] == "series" else ChartDataset)(prepared, frame)

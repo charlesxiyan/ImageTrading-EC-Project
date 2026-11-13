@@ -11,7 +11,7 @@ from sklearn.metrics import roc_auc_score
 
 from .evaluation import PROBABILISTIC
 
-ARCH_ORDER = ("plain", "residual")
+ARCH_ORDER = ("plain", "residual", "series1d")   # series1d = 1D CNN on raw OHLCV, no image
 
 
 def _split_key(key):
@@ -139,7 +139,7 @@ def takeaways(results, summary, boots):
     lines = []
     for exp, s in summary.groupby(level=0):
         s, boot = s.loc[exp], boots[exp]
-        cnn = [m for m in s.index if m.startswith("CNN")]
+        cnn = [m for m in s.index if m in ("CNN (plain)", "CNN (residual)")]   # image models
         best = max(cnn, key=lambda m: s.loc[m, "roc_auc"])
         b = s.loc[best]
         signal = "above" if b.auc_ci_low > 0.5 else "not distinguishable from"
@@ -154,6 +154,14 @@ def takeaways(results, summary, boots):
             ratio = s.loc["CNN (residual)", "parameters"] / s.loc["CNN (plain)", "parameters"]
             lines.append(f"- Residual − plain AUC: {d.mean():+.4f} [{lo:+.4f}, {hi:+.4f}] → {verdict} "
                          f"(residual has {ratio:.1f}× the parameters).")
+
+        if "CNN (series1d)" in s.index:
+            d = boot[best] - boot["CNN (series1d)"]
+            lo, hi = _ci(d)
+            verdict = ("the image helps" if lo > 0 else "the raw sequence is better" if hi < 0
+                       else "no significant difference: the picture adds nothing measurable")
+            lines.append(f"- {best} − 1D CNN on raw OHLCV (AUC {s.loc['CNN (series1d)', 'roc_auc']:.3f}): "
+                         f"{d.mean():+.4f} [{lo:+.4f}, {hi:+.4f}] → {verdict}.")
 
         d = boot[best] - boot["HGB hand features"]
         lo, hi = _ci(d)
