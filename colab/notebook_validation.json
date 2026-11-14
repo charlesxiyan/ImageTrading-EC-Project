@@ -1,0 +1,9 @@
+{
+  "status": "passed",
+  "execution_seconds": 20.2482942501083,
+  "bundle_sha256": "6c5123adc0b83463959739834a2a3f47fcfa2593292f38eb52efa9b01773c2b6",
+  "code_cells_executed": 13,
+  "runtime": "local CPU smoke only, not Colab GPU",
+  "real_test_model_evaluation": false,
+  "qa_directory": "colab/_local_validation/20261111_222507"
+}

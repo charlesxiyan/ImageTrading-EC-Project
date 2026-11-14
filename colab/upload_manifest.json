@@ -1,0 +1,11 @@
+{
+  "archive": "colab/cnn78u_colab_bundle.zip",
+  "bytes": 101918395,
+  "sha256": "6c5123adc0b83463959739834a2a3f47fcfa2593292f38eb52efa9b01773c2b6",
+  "files": 22,
+  "samples": {
+    "train": 1720827,
+    "validation": 509964,
+    "test": 1187989
+  }
+}

@@ -1,0 +1,16 @@
+{
+  "status": "passed",
+  "code_cells_executed": 12,
+  "seconds": 18.804447500035167,
+  "mode": "local CPU smoke; not Colab GPU training",
+  "test_evaluated": false,
+  "qa_directory": "colab/_local_validation/repair_cbx6pz96",
+  "checks": [
+    "same initialization",
+    "same subset",
+    "cached completed arm",
+    "changed contract rejected",
+    "epoch-boundary disconnect recovery",
+    "no test reports"
+  ]
+}

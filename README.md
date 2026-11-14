@@ -15,6 +15,8 @@ local and are ignored by git.
 | `adjust_bar_prices.py` | Split / corporate-action price adjustment of the bars (CRSP `cfacpr`). |
 | `fetch_distribution_inputs.py`, `adjust_dividend_bars.py`, `validate_dividend_bars.py` | Cash-dividend-inclusive price and share-volume adjustment. |
 | `us_pipeline/`, `configs/us_5min.json` | CNN78u sample preparation, image rendering and training. See `US_PIPELINE.md`. |
+| `colab/` | Earlier CNN78u Colab tests: baseline, training-repair and LR-scheduler notebooks with their runners and validators. The data bundle (`cnn78u_colab_bundle.zip`) stays local. |
+| `diagnostics/` | Diagnosis of the CNN78u next-bar collapse (`BASELINE_DIAGNOSIS.md`, `check_baseline.py`). |
 | `tests/` | Offline unit tests for the pipeline. |
 
 Documentation: [DATA_PIPELINE.md](DATA_PIPELINE.md) (universe, bar standard and price
