@@ -153,6 +153,7 @@ def prepare(config):
         'shape':[n,t,5],'permnos':ids,'features':FEATURES,'decision_clock_ns':pd.DatetimeIndex(clock).asi8.tolist(),
         'screening':screening,'splits':summary,'label_definition':'1 if adjusted_close[t+H]/adjusted_close[t]-1 > 0; 0 if < 0; zero returns excluded',
         'label_interpretation':'Dividend-adjusted chart-price return, not exact reinvested total return',
+        'price_basis':'features.npy holds end-of-data-basis prices (raw * multipliers.npy). Model inputs divide each window by its last bar\'s multipliers (point in time: anchor = last input bar); never use stored levels directly.',
         'preprocessing':'No imputation, SMOTE, class balancing, or global fitted scaler. Window-local OHLC axis and volume maximum only.',
         'session_policy':'Consecutive scheduled bars; normal overnight/holiday closures allowed by config; missing bars/membership gaps never compressed.'}
     (out/'manifest.json').write_text(json.dumps(metadata,indent=2)+'\n')

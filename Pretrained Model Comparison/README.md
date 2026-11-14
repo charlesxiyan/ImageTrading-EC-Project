@@ -36,6 +36,9 @@ Each model prints its total parameter count when loaded, and the table has a `pa
 - `vol_h1`: expected |return| of the next bar = mean over quantiles of |q − 1|, divided by the
   stock's training median |return| (the label threshold).
 - `xsdir_h12`: median forecast return over 12 bars minus its cross-sectional median at that bar.
+- `dir_h1`, `dir_h12`: median forecast return over 1 or 12 bars (label: strictly up, zero returns dropped).
+- Kronos sees OHLCV candles adjusted to the window's last bar (point in time); the other models see
+  closes divided by the last close.
 - AUC uses the raw score (pure zero-shot). For log loss, a 1-feature logistic regression is fitted
   on a training-period calibration sample and applied unchanged to validation.
 
@@ -58,7 +61,7 @@ python "Pretrained Model Comparison/tools/make_diagram.py"
 python "Pretrained Model Comparison/tools/make_notebook.py"
 ```
 
-## Results: run `run_20261114_012926` (Colab GPU)
+## Results: run `run_20261114_012926` (Colab GPU, before `dir_*` was added)
 
 Same 2023 H1 bundle and April 2023 validation month as `CNN-Relevant`, but scored on a subsample of
 80 validation timestamps (stride 6; about 27k samples per target) so the large models fit in a
@@ -99,7 +102,8 @@ Takeaways:
 
 Files in `results/run_20261114_012926/`: `comparison.csv` (all metrics, including accuracy,
 MAE vs random walk, run time and decile long-short), `comparison.png`, `settings.json`,
-`chronos2_ft_params.json`. The executed notebook keeps its outputs.
+`chronos2_ft_params.json`, and the executed notebook of that run
+(`Pretrained_Model_Comparison_executed.ipynb`).
 
 Not in git (stay on Drive, in `Colab Notebooks/EC/Project/Demo/Pretrained Model Comparison/runs/run_20261114_012926/`):
 cached forecasts (`forecasts/*.npy`) and `results.zip` (about 74 MB).

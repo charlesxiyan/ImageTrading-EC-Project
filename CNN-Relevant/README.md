@@ -12,6 +12,20 @@ Chart-image CNN for 5-minute US equity bars (Jiang–Kelly–Xiu style), a ResNe
 2. Open `ChartCNN_Baseline.ipynb`, select a GPU runtime, **Run all**.
 3. Outputs go to `Demo/CNN-Relevant/runs/<RUN_ID>/` (per run `<experiment>_<arch>/`, plus `analysis.csv`, `analysis.png`, `takeaways.md`).
 
+## Targets and price basis
+
+| experiment | label | stride |
+|---|---|---|
+| `vol_h1` | next bar's \|return\| above the stock's training median \|return\| | 6 |
+| `dir_h1` | next bar's return strictly positive (zero returns dropped) | 6 |
+| `xsdir_h12` | return over the next 12 bars above the cross-sectional median at that bar | 12 |
+| `dir_h12` | return over the next 12 bars strictly positive (zero returns dropped) | 12 |
+
+`dir_*` is the absolute direction, so it can be compared directly with the relative `xsdir_h12`.
+Strides follow the frame-correlation results: label autocorrelation is near 0 by lag 12 for
+12-bar labels. Every input window is adjusted to its own last bar (point in time), so no later
+split or dividend reaches the chart; see `DATA_PIPELINE.md`.
+
 ## Layout
 
 | Path | Content |
@@ -38,7 +52,7 @@ Chart-image CNN for 5-minute US equity bars (Jiang–Kelly–Xiu style), a ResNe
 | `residual` | [Conv → BN → LReLU → Conv → BN] + 1×1 skip → LReLU → MaxPool 2×1 | 2,047,362 |
 | `series1d` | No image: the same 78-bar window as a (5, 78) OHLCV sequence, scaled like the chart; 3 × [Conv1d k=5 → BN → LeakyReLU] (128/256/384 channels) → Linear | 720,770 |
 
-## Results: run `run_20261114_020923` (Colab GPU)
+## Results: run `run_20261114_020923` (Colab GPU, before `dir_*` was added)
 
 Data: 2023 H1 bundle, train to 2023-03-31, validate on April 2023 (test not evaluated).
 Settings (`results/run_20261114_020923/settings.json`): Adam lr 1e-5, weight decay 0, batch 128,
@@ -71,7 +85,8 @@ Takeaways (paired day-bootstrap differences, from `takeaways.md`):
 
 Files in `results/run_20261114_020923/`: `analysis.csv`, `analysis.png`, `takeaways.md`,
 `settings.json`, and per `<target>_<arch>/` the training `history.csv`, `summary.json`,
-`validation_comparison.csv` and `validation_deciles.csv`. The executed notebook keeps its outputs.
+`validation_comparison.csv` and `validation_deciles.csv`, and the executed notebook of that run
+(`ChartCNN_Baseline_executed.ipynb`).
 
 Not in git (stay on Drive, in `Colab Notebooks/EC/Project/Demo/CNN-Relevant/runs/run_20261114_020923/`):
 checkpoints (`best.pt`, `last.pt`), validation predictions and `results.zip` (about 107 MB).

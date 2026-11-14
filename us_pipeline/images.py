@@ -29,7 +29,10 @@ def render_window(window,include_volume=True):
 
 
 def prediction_basis(window,multipliers):
-    """Cancel end-of-dataset scale using the input endpoint's own multipliers."""
+    """Rebase a stored (end-of-data basis) window to its own anchor, the last input bar.
+
+    raw[d]*M[d]/M[a] = raw[d]*cfacpr[a]/cfacpr[d]*prod(1-D[e]/P[e-1], d<e<=a); volume uses cfacshr.
+    The anchor keeps its traded price and events after it cancel (tests/test_point_in_time.py)."""
     x=np.array(window,dtype=float,copy=True)
     price,volume=np.asarray(multipliers,dtype=float)
     if not np.isfinite([price,volume]).all() or min(price,volume)<=0:

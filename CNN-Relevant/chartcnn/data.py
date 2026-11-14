@@ -15,7 +15,7 @@ import pandas as pd
 import torch
 from torch.utils.data import Dataset
 
-from .images import prediction_basis, render_window
+from .images import point_in_time_window, render_window
 
 LOOKBACK = 78          # bars per image (one trading day of 5-minute bars)
 TARGETS = ("vol", "xs_dir", "dir")
@@ -30,6 +30,9 @@ class Store:
         self.config = self.manifest["config"]
         assert self.config["lookback"] == LOOKBACK and self.config["bar_minutes"] == 5
 
+        # Stored prices are on the end-of-data basis. Only ratios between two bars are used from
+        # these arrays (returns, labels, volume ratios), and those equal the point-in-time ratios.
+        # Absolute levels must come from point_in_time_window (see images.prediction_basis).
         features = np.load(self.root / "features.npy", mmap_mode="r")   # (stocks, slots, OHLCV)
         self.close = np.array(features[:, :, 3])
         self.volume = np.array(features[:, :, 4])
@@ -129,12 +132,12 @@ class ChartDataset(Dataset):
         return state
 
     def window(self, i):
-        """The raw (78, 5) OHLCV window ending at the decision bar, on a prediction-time basis."""
+        """The (78, 5) OHLCV window ending at the decision bar, adjusted to that bar (point in time)."""
         if self._x is None:
             self._x = np.load(self.root / "features.npy", mmap_mode="r")
             self._m = np.load(self.root / "multipliers.npy", mmap_mode="r")
         s, t = self.s[i], self.t[i]
-        return prediction_basis(self._x[s, t - LOOKBACK + 1:t + 1], self._m[s, t])
+        return point_in_time_window(self._x[s], self._m[s], t, LOOKBACK)
 
     def image(self, i):
         return render_window(self.window(i), self.include_volume)

@@ -25,7 +25,8 @@ md("""
 
 - **Input**: one trading day (78 five-minute bars) drawn as a 234×234 OHLC + volume chart.
 - **Models**: `plain` (Jiang–Kelly–Xiu style, top) and `residual` (blocks 2–3 become ResNet basic blocks with a skip connection, bottom), plus `series1d`: a 1D CNN fed the same windows as raw OHLCV numbers (no image), to test whether the picture itself helps.
-- **Targets**: `vol_h1` (is the next bar's move larger than usual?) and `xsdir_h12` (does the stock beat the cross-sectional median over the next hour?).
+- **Targets**: `vol_h1` (is the next bar's move larger than usual?), `xsdir_h12` (does the stock beat the cross-sectional median over the next hour?), and absolute direction `dir_h1` / `dir_h12` (is the return over the next bar / hour strictly positive? zero returns are dropped).
+- **Price adjustment**: every window is adjusted to its own last bar (point in time), so no later split or dividend reaches the input.
 - **Benchmarks**: training prior, simple rules, gradient-boosted trees on hand-made features.
 - **Code**: all logic lives in `chartcnn/` next to this notebook; cells only configure, run and plot.
 - **Drive layout**: `Demo/cnn78u_colab_bundle.zip` (data) and `Demo/CNN-Relevant/` (this notebook, `chartcnn/`, `runs/`).
@@ -78,8 +79,10 @@ SETTINGS = dict(
 )
 EXPERIMENTS = [
     dict(name="vol_h1", target="vol", horizon=1),                    # sanity check: signal is known to exist
+    dict(name="dir_h1", target="dir", horizon=1),                    # next bar strictly up vs down (zeros dropped)
     dict(name="xsdir_h12", target="xs_dir", horizon=12, stride=12),  # 1-hour relative direction; stride =
-]                                                                    # horizon so labels do not overlap
+    dict(name="dir_h12", target="dir", horizon=12, stride=12),       # 1-hour absolute direction; horizon so
+]                                                                    # labels do not overlap
 ARCHS = ["plain", "residual", "series1d"]         # image CNN, image ResNet, 1D CNN on raw OHLCV (no image)
 RESUME, RUN_ID = False, "local_smoke" if LOCAL_TEST else datetime.now(timezone.utc).strftime("run_%Y%m%d_%H%M%S")
 RUN_DRIVE, RUN_LOCAL = DRIVE / "runs" / RUN_ID, LOCAL / "run"

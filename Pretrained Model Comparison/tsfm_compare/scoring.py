@@ -5,6 +5,7 @@ Zero-shot scores (no label is ever used by the forecaster):
             divided by the stock's training median |return| (the label's own threshold)
     xs_dir  forecast median return over the horizon minus its cross-sectional median at
             the same decision bar (the label is "beats the cross-section")
+    dir     forecast median return over the horizon (the label is "strictly up")
 
 AUC uses the raw score, so it is a pure zero-shot number. For log loss we need a
 probability: a 1-feature logistic regression is fitted on the *training-period*

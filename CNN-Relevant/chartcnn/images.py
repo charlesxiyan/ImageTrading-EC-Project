@@ -47,8 +47,18 @@ def render_window(window: np.ndarray, include_volume: bool = True) -> np.ndarray
 
 
 def prediction_basis(window: np.ndarray, multipliers) -> np.ndarray:
-    """Undo end-of-sample split/dividend scaling using the window endpoint's own
-    multipliers, so the chart only uses information available at decision time."""
+    """Put a stored window on the basis of its own anchor (the last input bar).
+
+    The bundle stores prices on the end-of-data basis, raw * M[d], together with each bar's
+    multipliers M[d] (price) and V[d] (volume). Dividing the whole window by the anchor bar's
+    multipliers gives raw[d] * M[d] / M[a], which is exactly the point-in-time rule:
+
+        price  = raw[d] * cfacpr[a] / cfacpr[d] * prod(1 - D[e] / P[e-1], d < e <= a)
+        volume = raw[d] * cfacshr[d] / cfacshr[a]
+
+    The anchor bar keeps its traded price, and events after the anchor cancel out, so no future
+    split or dividend reaches the window (tested in tests/test_point_in_time.py).
+    """
     x = np.array(window, dtype=float, copy=True)
     price, volume = np.asarray(multipliers, dtype=float)
     if not np.isfinite([price, volume]).all() or min(price, volume) <= 0:
@@ -56,3 +66,14 @@ def prediction_basis(window: np.ndarray, multipliers) -> np.ndarray:
     x[:, :4] /= price
     x[:, 4] /= volume
     return x
+
+
+def point_in_time_window(features, multipliers, end: int, length: int) -> np.ndarray:
+    """The (length, 5) OHLCV window of one stock ending at slot `end`, adjusted to that slot.
+
+    features: (slots, 5) stored bars of one stock; multipliers: (slots, 2). Never use the stored
+    prices directly as levels: they already contain splits and dividends after the window.
+    """
+    if end - length + 1 < 0:
+        raise ValueError("Window starts before the first slot")
+    return prediction_basis(features[end - length + 1:end + 1], multipliers[end])
