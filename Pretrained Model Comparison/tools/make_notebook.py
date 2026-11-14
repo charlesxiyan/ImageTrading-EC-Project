@@ -1,6 +1,7 @@
 """Builds Pretrained_Model_Comparison.ipynb (run from anywhere; writes next to tsfm_compare/)."""
 import base64
 import json
+import sys
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -20,9 +21,9 @@ md("""
 
 <img src="FLOW_DATA_URI" alt="flow" width="100%">
 
-- **Question**: do off-the-shelf forecasting foundation models (Chronos-2, TimesFM, Moirai 2, Kronos) predict our two targets better than the chart CNN or simple baselines?
-- **Same data, splits and labels** as `CNN-Relevant/ChartCNN_Baseline.ipynb` (shared `chartcnn` package): January–March train, April validation; `vol_h1` (next bar moves more than usual) and `xsdir_h12` (beats the cross-section over the next hour).
-- **Zero-shot**: each model sees the last 78 closes and forecasts 12 bars ahead as quantiles. Its score is the forecast |return| (`vol`) or forecast return relative to other stocks (`xs_dir`). Labels are only used to fit a 1-feature calibration on training-period data, so log loss can be compared.
+- **Question**: do off-the-shelf forecasting foundation models (Chronos-2, TimesFM, Moirai 2, Kronos) predict our targets better than the chart CNN or simple baselines?
+- **Same data, splits and labels** as `CNN-Relevant/ChartCNN_Baseline.ipynb` (shared `chartcnn` package): January–March train, April validation; `vol_h1` (next bar moves more than usual), `xsdir_h12` (beats the cross-section over the next hour), and absolute direction `dir_h1` / `dir_h12` (next bar / hour strictly up; zero returns dropped).
+- **Zero-shot**: each model sees the last 78 closes and forecasts 12 bars ahead as quantiles. Its score is the forecast |return| (`vol`), the forecast return relative to other stocks (`xs_dir`), or the forecast return itself (`dir`). Labels are only used to fit a 1-feature calibration on training-period data, so log loss can be compared.
 - **Light fine-tune (optional)**: Chronos-2 with LoRA on training-period price series. It learns to forecast prices; it never sees the labels.
 - **Code**: all logic lives in `tsfm_compare/` next to this notebook. Cells only configure, run and display.
 """)
@@ -81,10 +82,12 @@ assert DEVICE == "cuda" or SMOKE, "Select a GPU runtime (Runtime > Change runtim
 
 EXPERIMENTS = [
     dict(name="vol_h1", target="vol", horizon=1),               # volatility: signal known to exist
+    dict(name="dir_h1", target="dir", horizon=1),               # next bar strictly up vs down (zeros dropped)
     dict(name="xsdir_h12", target="xs_dir", horizon=12),        # 1-hour relative direction
+    dict(name="dir_h12", target="dir", horizon=12),             # 1-hour absolute direction
 ]
 CONTEXT = 78            # bars the models see = exactly the CNN's chart window (one trading day)
-HORIZON = 12            # forecast once to 12 bars ahead, used by both targets
+HORIZON = 12            # forecast once to 12 bars ahead, used by every target
 STRIDE = 6              # same thinning as the CNN run
 N_VALID_TIMES = 2 if SMOKE else 80
 N_CALIB_TIMES = 2 if SMOKE else 40                              # training bars used for calibration only
@@ -120,7 +123,7 @@ save_json(RUN_LOCAL / "settings.json", dict(experiments=EXPERIMENTS, context=CON
 print("CNN run:", CNN_RUN, "\\nresults ->", RUN_DRIVE)
 """)
 
-md("## 4. Samples\nSame labels as the CNN notebook. Each (stock, bar) pair is forecast once and shared by both targets.")
+md("## 4. Samples\nSame labels as the CNN notebook. Each (stock, bar) pair is forecast once and shared by all targets.")
 code("""
 seed_all(SEED)
 store = chartcnn.Store(PREPARED)
@@ -134,7 +137,7 @@ print({part: f"{len(k):,} series to forecast" for part, k in KEYS.items()})
 
 md("""
 ## 5. Zero-shot foundation models
-For each model: load (prints the **total parameter count**), forecast validation and calibration series, score both targets. Forecasts are cached in `runs/<RUN_ID>/forecasts/` on Drive; after a disconnect set `RESUME_RUN_ID` in section 3 and run all again, and finished models are not re-forecast. A model that fails to install or load is reported and skipped.
+For each model: load (prints the **total parameter count**), forecast validation and calibration series, score every target. Forecasts are cached in `runs/<RUN_ID>/forecasts/` on Drive; after a disconnect set `RESUME_RUN_ID` in section 3 and run all again, and finished models are not re-forecast. A model that fails to install or load is reported and skipped.
 """)
 code("""
 ROWS, PROBS, FORECASTS = {}, {}, {}
@@ -176,7 +179,14 @@ md("""
 Trains on the January–March price series of every stock (forecast loss, no labels, nothing after the training end date), then is scored exactly like the zero-shot models.
 """)
 code("""
-if FINETUNE["enabled"]:
+cached = all((RUN_LOCAL / "forecasts" / f"chronos2_ft_{part}.npy").exists() for part in ("valid", "calib"))
+if FINETUNE["enabled"] and cached:          # resumed run: reuse the fine-tuned forecasts, skip training
+    meta = RUN_LOCAL / "forecasts" / "chronos2_ft_params.json"
+    n_params = json.loads(meta.read_text())["parameters"] if meta.exists() else None
+    q = {part: np.load(RUN_LOCAL / "forecasts" / f"chronos2_ft_{part}.npy") for part in ("valid", "calib")}
+    print(f"chronos2_ft: reusing cached forecasts ({n_params} parameters)")
+    record(dict(name="chronos2_ft", n_params=n_params, q=q, seconds=None), "foundation (fine-tuned)")
+elif FINETUNE["enabled"]:
     base = forecasters.build(dict(kind="chronos", name="chronos2", model_id=FINETUNE["base"]), DEVICE).load()
     series = training_series(store, max_stocks=20 if SMOKE else None, seed=SEED)
     print(f"fine-tune data: {len(series)} stock series, {sum(map(len, series)):,} bars")
@@ -186,6 +196,7 @@ if FINETUNE["enabled"]:
     result = runner.run_model(None, store, PREPARED, KEYS, CONTEXT, HORIZON, DEVICE,
                               RUN_LOCAL / "forecasts", RUN_DRIVE / "forecasts", model=tuned)
     record(result, "foundation (fine-tuned)")
+    save_json(RUN_LOCAL / "forecasts" / "chronos2_ft_params.json", dict(parameters=tuned.n_params), RUN_DRIVE / "forecasts")
     tuned.unload(); base.unload()
 """)
 
@@ -232,6 +243,6 @@ nb = dict(nbformat=4, nbformat_minor=5, cells=cells,
           metadata=dict(accelerator="GPU", colab=dict(provenance=[], gpuType="T4"),
                         kernelspec=dict(name="python3", display_name="Python 3"),
                         language_info=dict(name="python")))
-out = ROOT / "Pretrained_Model_Comparison.ipynb"
+out = Path(sys.argv[1]) if len(sys.argv) > 1 else ROOT / "Pretrained_Model_Comparison_dir_targets.ipynb"
 out.write_text(json.dumps(nb, indent=1, ensure_ascii=False) + "\n")
 print(out)

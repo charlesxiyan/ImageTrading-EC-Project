@@ -1,0 +1,39 @@
+{
+  "settings": {
+    "learning_rate": 1e-05,
+    "weight_decay": 0.0,
+    "batch_size": 128,
+    "eval_batch_size": 512,
+    "epochs": 12,
+    "patience": 2,
+    "min_delta": 1e-05,
+    "stride": 6,
+    "channels": [
+      64,
+      128,
+      256
+    ],
+    "head_height": 4,
+    "dropout": 0.5,
+    "num_workers": 8,
+    "seed": 69
+  },
+  "experiments": [
+    {
+      "name": "vol_h1",
+      "target": "vol",
+      "horizon": 1
+    },
+    {
+      "name": "xsdir_h12",
+      "target": "xs_dir",
+      "horizon": 12,
+      "stride": 12
+    }
+  ],
+  "archs": [
+    "plain",
+    "residual",
+    "series1d"
+  ]
+}

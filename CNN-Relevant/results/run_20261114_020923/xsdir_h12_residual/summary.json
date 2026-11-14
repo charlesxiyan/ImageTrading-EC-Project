@@ -1,0 +1,20 @@
+{
+  "experiment": {
+    "name": "xsdir_h12",
+    "target": "xs_dir",
+    "horizon": 12,
+    "stride": 12
+  },
+  "best_epoch": 1,
+  "long_short_cnn": {
+    "days": 19,
+    "mean_bps": 1.2564225165125544,
+    "t_stat": 0.5617999118347997
+  },
+  "long_short_hgb": {
+    "days": 19,
+    "mean_bps": 1.9345893810845616,
+    "t_stat": 0.5453562596015612
+  },
+  "smoke": false
+}

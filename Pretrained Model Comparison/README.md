@@ -36,6 +36,9 @@ Each model prints its total parameter count when loaded, and the table has a `pa
 - `vol_h1`: expected |return| of the next bar = mean over quantiles of |q − 1|, divided by the
   stock's training median |return| (the label threshold).
 - `xsdir_h12`: median forecast return over 12 bars minus its cross-sectional median at that bar.
+- `dir_h1`, `dir_h12`: median forecast return over 1 or 12 bars (label: strictly up, zero returns dropped).
+- Kronos sees OHLCV candles adjusted to the window's last bar (point in time); the other models see
+  closes divided by the last close.
 - AUC uses the raw score (pure zero-shot). For log loss, a 1-feature logistic regression is fitted
   on a training-period calibration sample and applied unchanged to validation.
 
@@ -58,7 +61,59 @@ python "Pretrained Model Comparison/tools/make_diagram.py"
 python "Pretrained Model Comparison/tools/make_notebook.py"
 ```
 
-The notebook was executed end to end on CPU with tiny random-weight models saved in each
-library's own checkpoint format (Hugging Face downloads are blocked in that sandbox), on the real
-bundle. That checks the code paths and shapes, not any accuracy. The first real numbers come from
-the Colab run.
+
+## Notebooks
+
+| file | what it is |
+|---|---|
+| `Pretrained_Model_Comparison.ipynb` | The notebook exactly as executed on Colab for `run_20261114_012926`, with all outputs (same file as on Drive). |
+| `Pretrained_Model_Comparison_dir_targets.ipynb` | Next version, not run yet: adds `dir_h1` / `dir_h12` and point-in-time windows. Upload it to Drive as `Pretrained_Model_Comparison.ipynb` for the next run. |
+
+`tools/make_notebook.py` regenerates the unexecuted notebook; write it to `Pretrained_Model_Comparison_dir_targets.ipynb`
+so the executed one is not overwritten.
+
+## Results: run `run_20261114_012926` (Colab GPU, before `dir_*` was added)
+
+Same 2023 H1 bundle and April 2023 validation month as `CNN-Relevant`, but scored on a subsample of
+80 validation timestamps (stride 6; about 27k samples per target) so the large models fit in a
+Colab session. Calibration uses 40 training-period timestamps. The CNN rows are read from the
+CNN run `run_20261113_185632` and rescored on the same subsample, so their AUCs are not the ones in
+`CNN-Relevant/README.md` (that table uses every validation sample). Settings are in
+`results/run_20261114_012926/settings.json`.
+
+| target | model | kind | parameters | val AUC | log loss vs prior |
+|---|---|---|---|---|---|
+| `vol_h1` | HGB hand features | baseline | 18,300 tree nodes | 0.734 | +14.6% |
+| `vol_h1` | ChartCNN series1d | CNN (trained) | 720,770 | 0.722 | +12.7% |
+| `vol_h1` | ChartCNN plain | CNN (trained) | 776,450 | 0.719 | +13.9% |
+| `vol_h1` | ChartCNN residual | CNN (trained) | 2,047,362 | 0.718 | +12.1% |
+| `vol_h1` | Kronos small | zero-shot | 28,699,418 | 0.699 | +11.1% |
+| `vol_h1` | Chronos-2 | zero-shot | 119,477,664 | 0.615 | +5.8% |
+| `vol_h1` | Chronos-2 + LoRA | fine-tuned | 120,684,576 | 0.611 | +5.8% |
+| `vol_h1` | rule: recent abs return | baseline | 0 | 0.611 | |
+| `vol_h1` | Moirai 2.0 small | zero-shot | 11,387,208 | 0.609 | +5.2% |
+| `vol_h1` | TimesFM | zero-shot | 330,710,976 | 0.605 | +5.6% |
+| `vol_h1` | Chronos-Bolt base | zero-shot | 205,292,928 | 0.594 | +5.0% |
+| `xsdir_h12` | Chronos-2 | zero-shot | 119,477,664 | 0.506 | +0.0% |
+| `xsdir_h12` | HGB hand features | baseline | 18,300 tree nodes | 0.506 | -0.2% |
+| `xsdir_h12` | TimesFM | zero-shot | 330,710,976 | 0.501 | -0.0% |
+| `xsdir_h12` | Chronos-Bolt base | zero-shot | 205,292,928 | 0.498 | -0.0% |
+| `xsdir_h12` | Chronos-2 + LoRA | fine-tuned | 120,684,576 | 0.493 | -0.1% |
+| `xsdir_h12` | Moirai 2.0 small | zero-shot | 11,387,208 | 0.487 | -0.0% |
+| `xsdir_h12` | Kronos small | zero-shot | 28,699,418 | 0.480 | -0.2% |
+
+Takeaways:
+
+- **No foundation model beats the small trained models on `vol_h1`.** Kronos, the only one that
+  sees full OHLCV candles, comes closest (0.699). The close-only models (Chronos, TimesFM, Moirai)
+  are no better than the one-line rule "recent absolute return" (0.611), despite 11M-331M parameters.
+- **LoRA fine-tuning of Chronos-2 did not help** (0.611 vs 0.615 zero-shot).
+- **`xsdir_h12`: every model is at 0.5.** Nothing, trained or pretrained, predicts 12-bar
+  cross-sectional direction.
+
+Files in `results/run_20261114_012926/`: `comparison.csv` (all metrics, including accuracy,
+MAE vs random walk, run time and decile long-short), `comparison.png`, `settings.json`,
+`chronos2_ft_params.json`.
+
+Not in git (stay on Drive, in `Colab Notebooks/EC/Project/Demo/Pretrained Model Comparison/runs/run_20261114_012926/`):
+cached forecasts (`forecasts/*.npy`) and `results.zip` (about 74 MB).

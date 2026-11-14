@@ -42,7 +42,7 @@ Defaults read `~/Market Data/demo_2023_h1` and write a new sibling directory nam
 
 Adjusted files replace only `open/high/low/close/vwap`. Original eligible volume, trade count, identifiers, timestamps, status, and missingness are preserved. Daily CFACPR, the anchor date/factor, and the applied multiplier are added for auditing. `adjustment_anchors.parquet` records each security's actual anchor, including earlier anchors for securities that exited or stopped trading. Missing exact-day factors for any available price cause an error; missing factors on wholly empty rows remain explicit and are never filled from a future date.
 
-The output manifest records the method, source checksums, per-file checksums, row counts, and affected PERMNOs. Latest-basis historical prices are a research representation, not an archive of as-published quotes. A strict point-in-time forecasting pipeline should rebase each input window using factors available at its prediction time.
+The output manifest records the method, source checksums, per-file checksums, row counts, and affected PERMNOs. Latest-basis historical prices are a research representation, not an archive of as-published quotes. Model inputs rebase each window to its own anchor; see [Point-in-time model inputs](#point-in-time-model-inputs-adjust-history-only-never-the-future).
 
 ## Cash-dividend-inclusive price and volume
 
@@ -80,6 +80,31 @@ The new output includes daily bars, `daily_adjustment_factors.parquet`, `adjustm
 The completed 2023 H1 run processed 813 distribution records: 807 applicable cash records, 3 corporate events handled by cumulative factors, and 3 records outside the security's adjustable history. Cash records form 800 security/ex-date groups across 405 securities. The result contains 124 files and 5,057,130 rows; 2,892,281 price rows receive additional cash adjustment, and 6,474 volume rows receive share adjustment (PCAR and MNST). All 224,156 missing-close intervals are preserved. Nine targeted dividend-adjustment tests passed, and all output files passed the independent read-back validation recorded in `validation_report.json`.
 
 This is proportional dividend-adjusted chart data: it removes the theoretical cash-dividend price step while preserving actual market movements. It is **not** an exact cash-dividend reinvestment total-return index, and adjusted prices multiplied by share-adjusted volume are not historical dollar turnover. Use raw prices and `volume_raw` for historical transaction amounts. All original TAQ filters and incomplete-cleaning limitations remain applicable. A point-in-time forecasting pipeline must use the factor basis available at each prediction time.
+
+
+## Point-in-time model inputs (adjust history only, never the future)
+
+Model inputs are adjusted to the anchor session, the session of each window's last input bar,
+never to the end of the data. Only one copy of the data is stored: the dividend-adjusted bars
+keep `*_raw` columns and the per-bar multipliers, and `us_pipeline` writes `features.npy`
+(end-of-data basis, `raw * M`) together with `multipliers.npy` (`M` for price, `V` for volume).
+When a window is cut, every bar d is divided by the anchor bar's multipliers:
+
+```text
+price[d]  = raw[d] * M[d] / M[a] = raw[d] * CFACPR[a] / CFACPR[d] * product(1 - D[e] / P[e-1], d < e <= a)
+volume[d] = raw[d] * V[d] / V[a] = raw[d] * CFACSHR[d] / CFACSHR[a]
+```
+
+- The anchor bar keeps its traded price and volume.
+- An event with an ex-date after the anchor cancels out, so it cannot affect the window.
+- Most windows (78 bars, about one session) contain no event, so their prices are the raw prices.
+- Stored levels are never used directly. Labels, returns, hand features and the close series given
+  to foundation models only use ratios between two bars, which equal the point-in-time ratios.
+
+Code: `prediction_basis` / `point_in_time_window` in `CNN-Relevant/chartcnn/images.py` (chart,
+1D CNN and Kronos inputs) and `prediction_basis` in `us_pipeline/images.py`.
+`tests/test_point_in_time.py` checks the formula against raw CRSP inputs, that the anchor keeps its
+traded price, and that dividends or splits after the anchor change nothing.
 
 ## Dynamic US equity universe
 

@@ -1,0 +1,15 @@
+{
+  "status": "passed",
+  "code_cells_executed": 9,
+  "seconds": 23.64648687490262,
+  "mode": "Local CPU smoke and synthetic plateau; not full Colab training",
+  "test_evaluated": false,
+  "qa_directory": "colab/_local_validation/scheduler_vm3r4ffw",
+  "checks": [
+    "all notebook cells",
+    "LR-reduction checkpoint recovery",
+    "resumed model exactly equals uninterrupted CPU model",
+    "cached result",
+    "changed scheduler rejected"
+  ]
+}

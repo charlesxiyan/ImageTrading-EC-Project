@@ -90,7 +90,8 @@ def close_contexts(store, keys, length):
 
 
 def ohlcv_contexts(prepared, store, keys, length):
-    """Raw OHLCV bars (n, length, 5) in prediction-time units (for Kronos, which models candles)."""
+    """OHLCV bars (n, length, 5) adjusted to each window's last bar (point in time), for Kronos,
+    which models candles and sees absolute levels. Same rule as chartcnn.images.prediction_basis."""
     feats = np.load(f"{prepared}/features.npy", mmap_mode="r")
     mult = np.load(f"{prepared}/multipliers.npy", mmap_mode="r")
     s = keys.security_index.to_numpy(np.int64)
