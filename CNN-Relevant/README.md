@@ -38,6 +38,7 @@ split or dividend reaches the chart; see `DATA_PIPELINE.md`.
 | `chartcnn/training.py` | Training loop, early stopping, resume, experiment runner, one-shot test |
 | `chartcnn/evaluation.py` | AUC, log loss vs prior, decile long-short |
 | `chartcnn/analysis.py` | Post-run analysis: plain vs residual, CNN vs baselines (day-bootstrap CIs), calibration, long-short, auto takeaways |
+| `chartcnn/grid.py` | Horizon × target grid used by `../Multi-Target Chart CNN Baseline/` (resumable cells, AUC-by-horizon analysis) |
 | `chartcnn/frame_corr.py` | Frame (image) / label / prediction correlation by lag, ICC, effective sample size |
 | `results/frame_corr/` | Frame-correlation results on April 2023 validation data |
 | `diagnostics/` | Signal-ceiling checks with hand features (`ceiling.py`, `horizons.py`) |
