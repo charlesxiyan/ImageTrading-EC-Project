@@ -61,6 +61,17 @@ python "Pretrained Model Comparison/tools/make_diagram.py"
 python "Pretrained Model Comparison/tools/make_notebook.py"
 ```
 
+
+## Notebooks
+
+| file | what it is |
+|---|---|
+| `Pretrained_Model_Comparison.ipynb` | The notebook exactly as executed on Colab for `run_20261114_012926`, with all outputs (same file as on Drive). |
+| `Pretrained_Model_Comparison_dir_targets.ipynb` | Next version, not run yet: adds `dir_h1` / `dir_h12` and point-in-time windows. Upload it to Drive as `Pretrained_Model_Comparison.ipynb` for the next run. |
+
+`tools/make_notebook.py` regenerates the unexecuted notebook; write it to `Pretrained_Model_Comparison_dir_targets.ipynb`
+so the executed one is not overwritten.
+
 ## Results: run `run_20261114_012926` (Colab GPU, before `dir_*` was added)
 
 Same 2023 H1 bundle and April 2023 validation month as `CNN-Relevant`, but scored on a subsample of
@@ -102,8 +113,7 @@ Takeaways:
 
 Files in `results/run_20261114_012926/`: `comparison.csv` (all metrics, including accuracy,
 MAE vs random walk, run time and decile long-short), `comparison.png`, `settings.json`,
-`chronos2_ft_params.json`, and the executed notebook of that run
-(`Pretrained_Model_Comparison_executed.ipynb`).
+`chronos2_ft_params.json`.
 
 Not in git (stay on Drive, in `Colab Notebooks/EC/Project/Demo/Pretrained Model Comparison/runs/run_20261114_012926/`):
 cached forecasts (`forecasts/*.npy`) and `results.zip` (about 74 MB).

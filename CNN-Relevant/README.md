@@ -52,6 +52,17 @@ split or dividend reaches the chart; see `DATA_PIPELINE.md`.
 | `residual` | [Conv → BN → LReLU → Conv → BN] + 1×1 skip → LReLU → MaxPool 2×1 | 2,047,362 |
 | `series1d` | No image: the same 78-bar window as a (5, 78) OHLCV sequence, scaled like the chart; 3 × [Conv1d k=5 → BN → LeakyReLU] (128/256/384 channels) → Linear | 720,770 |
 
+
+## Notebooks
+
+| file | what it is |
+|---|---|
+| `ChartCNN_Baseline.ipynb` | The notebook exactly as executed on Colab for `run_20261114_020923`, with all outputs (same file as on Drive). |
+| `ChartCNN_Baseline_dir_targets.ipynb` | Next version, not run yet: adds `dir_h1` / `dir_h12` and point-in-time windows. Upload it to Drive as `ChartCNN_Baseline.ipynb` for the next run. |
+
+`tools/make_notebook.py` regenerates the unexecuted notebook; write it to `ChartCNN_Baseline_dir_targets.ipynb`
+so the executed one is not overwritten.
+
 ## Results: run `run_20261114_020923` (Colab GPU, before `dir_*` was added)
 
 Data: 2023 H1 bundle, train to 2023-03-31, validate on April 2023 (test not evaluated).
@@ -85,8 +96,7 @@ Takeaways (paired day-bootstrap differences, from `takeaways.md`):
 
 Files in `results/run_20261114_020923/`: `analysis.csv`, `analysis.png`, `takeaways.md`,
 `settings.json`, and per `<target>_<arch>/` the training `history.csv`, `summary.json`,
-`validation_comparison.csv` and `validation_deciles.csv`, and the executed notebook of that run
-(`ChartCNN_Baseline_executed.ipynb`).
+`validation_comparison.csv` and `validation_deciles.csv`.
 
 Not in git (stay on Drive, in `Colab Notebooks/EC/Project/Demo/CNN-Relevant/runs/run_20261114_020923/`):
 checkpoints (`best.pt`, `last.pt`), validation predictions and `results.zip` (about 107 MB).

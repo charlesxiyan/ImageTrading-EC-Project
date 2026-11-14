@@ -1,6 +1,7 @@
 """Builds Pretrained_Model_Comparison.ipynb (run from anywhere; writes next to tsfm_compare/)."""
 import base64
 import json
+import sys
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -242,6 +243,6 @@ nb = dict(nbformat=4, nbformat_minor=5, cells=cells,
           metadata=dict(accelerator="GPU", colab=dict(provenance=[], gpuType="T4"),
                         kernelspec=dict(name="python3", display_name="Python 3"),
                         language_info=dict(name="python")))
-out = ROOT / "Pretrained_Model_Comparison.ipynb"
+out = Path(sys.argv[1]) if len(sys.argv) > 1 else ROOT / "Pretrained_Model_Comparison_dir_targets.ipynb"
 out.write_text(json.dumps(nb, indent=1, ensure_ascii=False) + "\n")
 print(out)
