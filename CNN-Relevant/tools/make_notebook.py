@@ -29,7 +29,7 @@ md("""
 - **Price adjustment**: every window is adjusted to its own last bar (point in time), so no later split or dividend reaches the input.
 - **Benchmarks**: training prior, simple rules, gradient-boosted trees on hand-made features.
 - **Code**: all logic lives in `chartcnn/` next to this notebook; cells only configure, run and plot.
-- **Drive layout**: `Demo/cnn78u_colab_bundle.zip` (data) and `Demo/CNN-Relevant/` (this notebook, `chartcnn/`, `runs/`).
+- **Drive layout**: `Demo/cnn78u_colab_bundle.zip` (data; converted to bundle v2, which keeps zero-return windows) and `Demo/CNN-Relevant/` (this notebook, `chartcnn/`, `runs/`).
 """.replace("{diagram}", diagram))
 
 md("## 1. Setup")

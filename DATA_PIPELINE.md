@@ -98,13 +98,38 @@ volume[d] = raw[d] * V[d] / V[a] = raw[d] * CFACSHR[d] / CFACSHR[a]
 - The anchor bar keeps its traded price and volume.
 - An event with an ex-date after the anchor cancels out, so it cannot affect the window.
 - Most windows (78 bars, about one session) contain no event, so their prices are the raw prices.
-- Stored levels are never used directly. Labels, returns, hand features and the close series given
-  to foundation models only use ratios between two bars, which equal the point-in-time ratios.
+- Stored levels are never used directly. Returns, hand features and the close series given
+  to foundation models only use ratios between two bars up to the anchor, which equal the
+  point-in-time ratios.
+- **Labels** use unadjusted (traded) prices: `raw[t+H] / raw[t] = stored[t+H] / stored[t] * M[t] / M[t+H]`.
+  Inside one session no ex-date can fall between the two bars. A horizon that crosses the overnight
+  gap into an ex-date session is dropped (`chartcnn.data.build_split`), because its unadjusted return
+  would contain the split or dividend jump: about 0.02% of windows at H=1 and 0.2% at H=12.
 
 Code: `prediction_basis` / `point_in_time_window` in `CNN-Relevant/chartcnn/images.py` (chart,
 1D CNN and Kronos inputs) and `prediction_basis` in `us_pipeline/images.py`.
 `tests/test_point_in_time.py` checks the formula against raw CRSP inputs, that the anchor keeps its
 traded price, and that dividends or splits after the anchor change nothing.
+
+### Window screening: bundle v2
+
+The first prepared bundle (`artifacts/cnn78u_5min_h1`, `cnn78u_colab_bundle.zip`) dropped every
+window whose next-bar return was exactly zero (163,566 windows, 4.6%). That selects windows on
+future data and biases every other target built from them (volatility, cross-sectional direction,
+longer horizons). Bundle v2 keeps them: same bars, `drop_zero_returns: false` in
+`configs/us_5min_v2.json`. Direction targets drop zero returns themselves, per target and horizon.
+
+```bash
+# Rebuild the window lists from an existing prepared folder (bars are unchanged) and audit them.
+python -m us_pipeline rescreen --config configs/us_5min_v2.json --source artifacts/cnn78u_5min_h1/prepared
+python -m us_pipeline audit --config configs/us_5min_v2.json
+python colab/build_colab_bundle.py --version v2          # colab/cnn78u_colab_bundle_v2.zip
+```
+
+v2 has 1,796,575 / 537,272 / 1,248,499 train / validation / test windows; every v1 window is in it
+with the same return, and the added ones all have a zero next-bar return. On Colab, if only the v1
+zip is on Drive, `chartcnn.utils.stage_bundle` derives the v2 windows from it at start-up
+(`rescreen_all_windows`, identical output; `tests/test_bundle_v2.py`).
 
 ## Dynamic US equity universe
 

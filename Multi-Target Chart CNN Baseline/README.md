@@ -14,8 +14,14 @@ validation AUC with day-bootstrap intervals against the horizon.
 
 ## Design
 
-- **Data**: the same `cnn78u_colab_bundle.zip` (2023 H1, ~528 stocks), train to 2023-03-31,
-  validate on April 2023. Test (May–June) is not touched.
+- **Data**: bundle v2 (2023 H1, ~528 stocks), train to 2023-03-31, validate on
+  April 2023. Test (May–June) is not touched. v2 has the same bars as v1 but keeps every window:
+  v1 had dropped windows whose next-bar return was exactly zero (4.6% of them), which selects on
+  future data. Direction targets now drop zero returns themselves, per target and horizon.
+- **Labels** use unadjusted (traded) prices, as the price-adjustment policy requires. A label whose
+  horizon contains an ex-date (only possible across the overnight gap) is dropped, because its
+  unadjusted return would include the split or dividend jump: 0.02% of windows at 5 minutes,
+  0.2% at 60 minutes.
 - **Inputs**: one trading day of 78 five-minute bars, adjusted point in time to the window's last bar
   (`chartcnn.images.point_in_time_window`), drawn as a 234×234 chart or fed as raw OHLCV numbers.
 - **Stride 12 for every horizon**: one sample per stock per hour (~143k train / ~42k validation per
@@ -33,8 +39,10 @@ validation AUC with day-bootstrap intervals against the horizon.
 
 ## Run (Google Colab)
 
-1. Drive layout (the data zip is the one the CNN-Relevant notebook already uses):
-   - `Colab Notebooks/EC/Project/Demo/cnn78u_colab_bundle.zip`
+1. Drive layout:
+   - `Colab Notebooks/EC/Project/Demo/cnn78u_colab_bundle.zip` (the existing data zip). The notebook
+     turns it into v2 at start-up (about 30 seconds: same bars, all windows kept). If
+     `cnn78u_colab_bundle_v2.zip` is in `Demo/`, that is used instead.
    - `Colab Notebooks/EC/Project/Demo/Multi-Target Chart CNN Baseline/` (this folder: notebook, `chartcnn/`)
 2. Open `Multi_Target_Chart_CNN.ipynb`, Runtime → Change runtime type → GPU (L4 or A100), **Run all**.
 3. The run id is printed in section 2. Outputs go to `runs/<RUN_ID>/`.

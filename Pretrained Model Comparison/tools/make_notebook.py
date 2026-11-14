@@ -64,7 +64,7 @@ from chartcnn.utils import stage_bundle, save_json, seed_all
 from tsfm_compare import build_samples, union_keys, training_series, forecasters, runner, scoring, plots
 
 LOCAL = Path(tempfile.mkdtemp(prefix="pmc_", dir=None if LOCAL_TEST else "/content"))
-PREPARED = stage_bundle(DEMO, LOCAL / "bundle")                  # DEMO/cnn78u_colab_bundle.zip -> local disk
+PREPARED = stage_bundle(DEMO, LOCAL / "bundle")                  # bundle v2 -> local disk (derived from DEMO/cnn78u_colab_bundle.zip if needed)
 DEVICE = "cuda" if torch.cuda.is_available() else "cpu"
 print("chartcnn from:", CNN_HOME, "| data:", PREPARED, "| device:", DEVICE)
 from IPython.display import Image

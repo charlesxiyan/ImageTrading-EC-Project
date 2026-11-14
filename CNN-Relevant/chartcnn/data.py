@@ -6,6 +6,12 @@ Here we keep those windows, optionally thin them with a stride, and attach a new
     vol     1 if |r(t -> t+H)| > that stock's TRAINING-period median |r|     (volatility)
     xs_dir  1 if r(t -> t+H) > cross-sectional median at the same timestamp  (relative direction)
     dir     1 if r(t -> t+H) > 0, zero returns dropped                       (raw direction)
+
+r is the return on unadjusted (traded) prices, as the price-adjustment policy in CLAUDE.md
+requires for labels. A label whose horizon contains an ex-date (a split, stock dividend or cash
+dividend between bar t and bar t+H, which can only happen across the overnight gap) is dropped:
+its unadjusted return would contain the event's price jump, not a market move. This affects about
+0.02% (H=1) to 0.2% (H=12) of windows.
 """
 import json
 from pathlib import Path
@@ -38,6 +44,9 @@ class Store:
         self.volume = np.array(features[:, :, 4])
         self.log_close = np.log(self.close)
         self.T = self.close.shape[1]
+        # Per-bar price multiplier M[d] (stored = raw * M[d]). raw[t+H] / raw[t] =
+        # stored[t+H] / stored[t] * M[t] / M[t+H]; M changes only on an ex-date.
+        self.price_mult = np.array(np.load(self.root / "multipliers.npy", mmap_mode="r")[:, :, 0])
 
         # bad_cumsum[s, j] = number of missing slots before slot j  ->  O(1) "is range complete?"
         valid = np.load(self.root / "valid.npy")
@@ -76,9 +85,12 @@ def build_split(store, split, target, horizon, stride, train_abs_median=None):
     keep = store.complete(s, t + 1, t + h + 1)
     if split in boundary:
         keep &= end_dates <= boundary[split]
+    m0, m1 = store.price_mult[s, t], store.price_mult[s, t + h]
+    keep &= np.abs(m1 / m0 - 1.0) < 1e-12               # no ex-date inside the label horizon
     f, s, t = f[keep].reset_index(drop=True), s[keep], t[keep]
 
-    r = store.close[s, t + h] / store.close[s, t] - 1.0
+    # Unadjusted (traded-price) return, per the policy. Equal to the stored ratio on kept rows.
+    r = (store.close[s, t + h] / store.price_mult[s, t + h]) / (store.close[s, t] / store.price_mult[s, t]) - 1.0
     f["forward_return"] = r
     f["xs_return"] = r - f.groupby("end_index").forward_return.transform("median").to_numpy()
     f["decision_date"] = store.dates[t]

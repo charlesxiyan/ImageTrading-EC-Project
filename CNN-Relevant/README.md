@@ -7,7 +7,7 @@ Chart-image CNN for 5-minute US equity bars (Jiang–Kelly–Xiu style), a ResNe
 ## Run (Google Colab)
 
 1. Drive layout:
-   - `Colab Notebooks/EC/Project/Demo/cnn78u_colab_bundle.zip` (data)
+   - `Colab Notebooks/EC/Project/Demo/cnn78u_colab_bundle.zip` (data). chartcnn ≥ 2026-11-14.3 converts it to bundle v2 at start-up (the v1 window list dropped windows whose next-bar return was zero); a `cnn78u_colab_bundle_v2.zip` next to it is used instead if present
    - `Colab Notebooks/EC/Project/Demo/CNN-Relevant/` (this folder: notebook + `chartcnn/`)
 2. Open `ChartCNN_Baseline.ipynb`, select a GPU runtime, **Run all**.
 3. Outputs go to `Demo/CNN-Relevant/runs/<RUN_ID>/` (per run `<experiment>_<arch>/`, plus `analysis.csv`, `analysis.png`, `takeaways.md`).

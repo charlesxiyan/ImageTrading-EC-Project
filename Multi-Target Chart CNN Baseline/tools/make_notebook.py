@@ -53,10 +53,10 @@ from IPython.display import display, Markdown
 import chartcnn
 from chartcnn import grid
 from chartcnn.utils import stage_bundle, save_json
-assert chartcnn.__version__ >= "2026-11-14.2", f"stale chartcnn {chartcnn.__version__} in {CODE}"
+assert chartcnn.__version__ >= "2026-11-14.3", f"stale chartcnn {chartcnn.__version__} in {CODE}"
 
 LOCAL = Path(tempfile.mkdtemp(prefix="mtcnn_", dir=None if LOCAL_TEST else "/content"))
-PREPARED = stage_bundle(DEMO, LOCAL / "bundle")  # unzip data to fast local disk
+PREPARED = stage_bundle(DEMO, LOCAL / "bundle")  # bundle v2 on fast local disk (derived from v1 zip if needed)
 DEVICE = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 torch.backends.cudnn.benchmark = True
 print("data:", PREPARED, "| device:", DEVICE, torch.cuda.get_device_name() if DEVICE.type == "cuda" else "")
@@ -118,7 +118,7 @@ del model
 
 md("""
 ## 4. Labels
-Sample counts and positive shares per cell. The validation month (April 2023) was calmer than the training months, so the `vol` positive share is below 0.5 there; `dir` shares drift with the market. AUC is not affected by either; log loss is.
+Sample counts and positive shares per cell. Labels use unadjusted prices; a label whose horizon contains an ex-date is dropped, and `dir` drops zero returns (per cell). The validation month (April 2023) was calmer than the training months, so the `vol` positive share is below 0.5 there; `dir` shares drift with the market. AUC is not affected by either; log loss is.
 """)
 code("""
 OVERVIEW = grid.label_overview(store, CELLS)
