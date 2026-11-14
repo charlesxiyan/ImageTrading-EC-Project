@@ -100,6 +100,21 @@ def baseline_rows(store, samples, experiments, seed=69, max_train=300_000):
     return out
 
 
+def _cnn_probs(run_dir, folder):
+    """best_valid_prob.npy from the experiment folder, else from the run's results.zip
+    (ChartCNN runs keep this file on the Colab disk and only ship it inside results.zip)."""
+    if (folder / "best_valid_prob.npy").exists():
+        return np.load(folder / "best_valid_prob.npy")
+    archive = run_dir / "results.zip"
+    if archive.exists():
+        import io, zipfile
+        with zipfile.ZipFile(archive) as z:
+            name = f"{folder.name}/best_valid_prob.npy"
+            if name in z.namelist():
+                return np.load(io.BytesIO(z.read(name)))
+    return None
+
+
 def cnn_rows(store, samples, experiments, run_dir):
     """Validation probabilities saved by a ChartCNN run (CNN-Relevant/runs/<RUN_ID>/).
 
@@ -113,13 +128,16 @@ def cnn_rows(store, samples, experiments, run_dir):
     out = {}
     for exp in experiments:
         d, rows = samples[exp["name"]], []
-        folders = sorted(p for p in run_dir.glob(f"{exp['name']}*") if (p / "best_valid_prob.npy").exists())
+        folders = sorted(p for p in run_dir.glob(f"{exp['name']}*") if p.is_dir())
         if not folders:
             continue
         train, median = build_split(store, "train", exp["target"], exp["horizon"], stride)
         valid, _ = build_split(store, "validation", exp["target"], exp["horizon"], stride, median)
         for folder in folders:
-            p = np.load(folder / "best_valid_prob.npy")
+            p = _cnn_probs(run_dir, folder)
+            if p is None:
+                print(f"skip {folder.name}: no best_valid_prob.npy (folder or results.zip)")
+                continue
             if len(p) != len(valid):
                 print(f"skip {folder.name}: {len(p)} probabilities vs {len(valid)} rebuilt samples")
                 continue

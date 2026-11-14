@@ -1,0 +1,11 @@
+{
+  "experiment": {
+    "name": "vol_h1",
+    "target": "vol",
+    "horizon": 1
+  },
+  "best_epoch": 4,
+  "long_short_cnn": null,
+  "long_short_hgb": null,
+  "smoke": false
+}

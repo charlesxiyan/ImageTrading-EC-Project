@@ -1,0 +1,63 @@
+{
+  "experiments": [
+    {
+      "name": "vol_h1",
+      "target": "vol",
+      "horizon": 1
+    },
+    {
+      "name": "xsdir_h12",
+      "target": "xs_dir",
+      "horizon": 12
+    }
+  ],
+  "context": 78,
+  "horizon": 12,
+  "stride": 6,
+  "n_valid_times": 80,
+  "n_calib_times": 40,
+  "models": [
+    {
+      "kind": "chronos",
+      "name": "chronos2",
+      "model_id": "amazon/chronos-2",
+      "batch_size": 1024
+    },
+    {
+      "kind": "chronos",
+      "name": "chronos_bolt_base",
+      "model_id": "amazon/chronos-bolt-base",
+      "batch_size": 1024
+    },
+    {
+      "kind": "timesfm",
+      "name": "timesfm",
+      "model_id": "google/timesfm-3.0-pytorch",
+      "batch_size": 512
+    },
+    {
+      "kind": "moirai",
+      "name": "moirai2_small",
+      "model_id": "Salesforce/moirai-2.0-R-small",
+      "batch_size": 1024
+    },
+    {
+      "kind": "kronos",
+      "name": "kronos_small",
+      "model_id": "NeoQuasar/Kronos-small",
+      "tokenizer": "NeoQuasar/Kronos-Tokenizer-base",
+      "repo": "/content/Kronos",
+      "samples": 8,
+      "batch_size": 256
+    }
+  ],
+  "finetune": {
+    "enabled": true,
+    "base": "amazon/chronos-2",
+    "mode": "lora",
+    "learning_rate": 1e-05,
+    "num_steps": 2000,
+    "batch_size": 256
+  },
+  "cnn_run": "/content/drive/MyDrive/Colab Notebooks/EC/Project/Demo/CNN-Relevant/runs/run_20261113_185632"
+}

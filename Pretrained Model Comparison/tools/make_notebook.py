@@ -176,7 +176,14 @@ md("""
 Trains on the January–March price series of every stock (forecast loss, no labels, nothing after the training end date), then is scored exactly like the zero-shot models.
 """)
 code("""
-if FINETUNE["enabled"]:
+cached = all((RUN_LOCAL / "forecasts" / f"chronos2_ft_{part}.npy").exists() for part in ("valid", "calib"))
+if FINETUNE["enabled"] and cached:          # resumed run: reuse the fine-tuned forecasts, skip training
+    meta = RUN_LOCAL / "forecasts" / "chronos2_ft_params.json"
+    n_params = json.loads(meta.read_text())["parameters"] if meta.exists() else None
+    q = {part: np.load(RUN_LOCAL / "forecasts" / f"chronos2_ft_{part}.npy") for part in ("valid", "calib")}
+    print(f"chronos2_ft: reusing cached forecasts ({n_params} parameters)")
+    record(dict(name="chronos2_ft", n_params=n_params, q=q, seconds=None), "foundation (fine-tuned)")
+elif FINETUNE["enabled"]:
     base = forecasters.build(dict(kind="chronos", name="chronos2", model_id=FINETUNE["base"]), DEVICE).load()
     series = training_series(store, max_stocks=20 if SMOKE else None, seed=SEED)
     print(f"fine-tune data: {len(series)} stock series, {sum(map(len, series)):,} bars")
@@ -186,6 +193,7 @@ if FINETUNE["enabled"]:
     result = runner.run_model(None, store, PREPARED, KEYS, CONTEXT, HORIZON, DEVICE,
                               RUN_LOCAL / "forecasts", RUN_DRIVE / "forecasts", model=tuned)
     record(result, "foundation (fine-tuned)")
+    save_json(RUN_LOCAL / "forecasts" / "chronos2_ft_params.json", dict(parameters=tuned.n_params), RUN_DRIVE / "forecasts")
     tuned.unload(); base.unload()
 """)
 
