@@ -1,0 +1,9 @@
+numpy
+pandas
+pyarrow
+Pillow
+torch>=2.3
+scikit-learn
+matplotlib
+tqdm
+psutil

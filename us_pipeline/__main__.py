@@ -2,18 +2,23 @@
 import argparse
 import json
 from pathlib import Path
-from .data import read_config,prepare,audit_prepared
+from .data import read_config,prepare,rescreen,audit_prepared
 
 
 def main():
     p=argparse.ArgumentParser(description=__doc__)
-    p.add_argument('command',choices=['prepare','audit','preview','train','test'])
+    p.add_argument('command',choices=['prepare','rescreen','audit','preview','train','test'])
     p.add_argument('--config',default='configs/us_5min.json')
     p.add_argument('--smoke',action='store_true',help='Two train batches and a tiny validation subset; no test access')
     p.add_argument('--checkpoint',type=Path)
+    p.add_argument('--source',type=Path,help='rescreen: existing prepared/ folder to copy bars from')
     a=p.parse_args();config=read_config(a.config)
     if a.command=='prepare':
         prepare(config)
+    elif a.command=='rescreen':
+        if a.source is None:
+            p.error('rescreen requires --source <existing prepared folder>')
+        rescreen(config,a.source)
     elif a.command=='audit':
         audit_prepared(config)
     elif a.command=='preview':

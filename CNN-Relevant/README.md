@@ -7,7 +7,7 @@ Chart-image CNN for 5-minute US equity bars (Jiang–Kelly–Xiu style), a ResNe
 ## Run (Google Colab)
 
 1. Drive layout:
-   - `Colab Notebooks/EC/Project/Demo/cnn78u_colab_bundle.zip` (data)
+   - `Colab Notebooks/EC/Project/Demo/cnn78u_colab_bundle.zip` (data). chartcnn ≥ 2026-11-14.3 converts it to bundle v2 at start-up (the v1 window list dropped windows whose next-bar return was zero); a `cnn78u_colab_bundle_v2.zip` next to it is used instead if present
    - `Colab Notebooks/EC/Project/Demo/CNN-Relevant/` (this folder: notebook + `chartcnn/`)
 2. Open `ChartCNN_Baseline.ipynb`, select a GPU runtime, **Run all**.
 3. Outputs go to `Demo/CNN-Relevant/runs/<RUN_ID>/` (per run `<experiment>_<arch>/`, plus `analysis.csv`, `analysis.png`, `takeaways.md`).
@@ -38,6 +38,7 @@ split or dividend reaches the chart; see `DATA_PIPELINE.md`.
 | `chartcnn/training.py` | Training loop, early stopping, resume, experiment runner, one-shot test |
 | `chartcnn/evaluation.py` | AUC, log loss vs prior, decile long-short |
 | `chartcnn/analysis.py` | Post-run analysis: plain vs residual, CNN vs baselines (day-bootstrap CIs), calibration, long-short, auto takeaways |
+| `chartcnn/grid.py` | Horizon × target grid used by `../Multi-Target Chart CNN Baseline/` (resumable cells, AUC-by-horizon analysis) |
 | `chartcnn/frame_corr.py` | Frame (image) / label / prediction correlation by lag, ICC, effective sample size |
 | `results/frame_corr/` | Frame-correlation results on April 2023 validation data |
 | `diagnostics/` | Signal-ceiling checks with hand features (`ceiling.py`, `horizons.py`) |

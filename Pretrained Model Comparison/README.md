@@ -8,7 +8,7 @@ Zero-shot (and lightly fine-tuned) time-series foundation models vs the chart CN
 ## Run (Google Colab)
 
 1. Drive layout (`Colab Notebooks/EC/Project/Demo/`):
-   - `cnn78u_colab_bundle.zip` (data, already there)
+   - `cnn78u_colab_bundle.zip` (data, already there; chartcnn ≥ 2026-11-14.3 converts it to bundle v2 at start-up)
    - `CNN-Relevant/chartcnn/` (shared data/eval code, already there)
    - `Pretrained Model Comparison/` (this folder: notebook + `tsfm_compare/`)
 2. Optional but recommended: run `CNN-Relevant/ChartCNN_Baseline.ipynb` first. The newest run in

@@ -62,7 +62,13 @@ def sample_indices(valid,close,timestamps,config,permnos):
         stats['purged_split_boundary']+=int((~contained).sum())
         e,splits=e[contained],splits[contained]
         returns=close[stock,e+h]/close[stock,e]-1.
-        nonzero=np.abs(returns)>config['zero_return_epsilon']
+        # drop_zero_returns=False keeps every window: dropping on the next bar's return selects
+        # windows with future data, which biases any other label built from them. Targets that
+        # need a nonzero return (direction) drop zeros themselves, per target, at label time.
+        if config.get('drop_zero_returns',True):
+            nonzero=np.abs(returns)>config['zero_return_epsilon']
+        else:
+            nonzero=np.ones(len(returns),dtype=bool)
         stats['zero_return']+=int((~nonzero).sum())
         e,splits,returns=e[nonzero],splits[nonzero],returns[nonzero]
         stats['kept']+=len(e)
@@ -137,6 +143,35 @@ def prepare(config):
         clock.extend(pd.date_range(origin,periods=slots,freq=f'{config["bar_minutes"]}min')
                      +pd.Timedelta(minutes=config['bar_minutes']))
     features.flush();valid.flush();scales.flush()
+    return write_samples(config,out,features,valid,clock,ids)
+
+
+def rescreen(config,source):
+    """Rebuild only the window lists from an existing prepared folder.
+
+    features/valid/multipliers depend only on the source bars, not on the window screening, so
+    they are copied unchanged; sample_indices runs again with the new config. Same result as
+    `prepare` on the same source data."""
+    import shutil
+    source=Path(source);out=Path(config['artifact_root'])/'prepared'
+    if out.exists():
+        raise ValueError(f'Prepared output exists: {out}; choose a new artifact_root')
+    old=json.loads((source/'manifest.json').read_text())
+    for key in ('lookback','bar_minutes','train_end','validation_end'):
+        if old['config'][key]!=config[key]:
+            raise ValueError(f'{key} differs from the source; run prepare instead')
+    out.mkdir(parents=True)
+    for name in ('features.npy','valid.npy','multipliers.npy'):
+        shutil.copy2(source/name,out/name)
+    features=np.load(out/'features.npy',mmap_mode='r');valid=np.load(out/'valid.npy',mmap_mode='r')
+    clock=pd.to_datetime(old['decision_clock_ns'],unit='ns',utc=True).tz_convert('America/New_York')
+    config=dict(config,rescreened_from={'source_manifest_sha256':digest(source/'manifest.json'),
+        'source_data_manifest_sha256':old['source_manifest_sha256'],'source_screening':old['screening']})
+    return write_samples(config,out,features,valid,list(clock),old['permnos'],old['source_manifest_sha256'])
+
+
+def write_samples(config,out,features,valid,clock,ids,source_sha=None):
+    n,t=valid.shape
     samples,screening=sample_indices(valid,features[:,:,3],clock,config,ids)
     summary={}
     for split,frame in samples.items():
@@ -149,9 +184,13 @@ def prepare(config):
             'positive_fraction':float(frame.label.mean()),'majority_fraction':majority,
             'decision_start':str(frame.decision_time.min()),'decision_end':str(frame.decision_time.max()),
             'label_end_max':str(frame.label_end_time.max())}
-    metadata={'status':'complete','config':config,'source_manifest_sha256':digest(root/'manifest.json'),
+    if source_sha is None:
+        source_sha=digest(Path(config['data_root'])/'manifest.json')
+    zero_rule=('zero returns excluded' if config.get('drop_zero_returns',True)
+               else 'zero returns kept (label 0); direction targets drop them at label time')
+    metadata={'status':'complete','config':config,'source_manifest_sha256':source_sha,
         'shape':[n,t,5],'permnos':ids,'features':FEATURES,'decision_clock_ns':pd.DatetimeIndex(clock).asi8.tolist(),
-        'screening':screening,'splits':summary,'label_definition':'1 if adjusted_close[t+H]/adjusted_close[t]-1 > 0; 0 if < 0; zero returns excluded',
+        'screening':screening,'splits':summary,'label_definition':'1 if adjusted_close[t+H]/adjusted_close[t]-1 > 0, else 0; '+zero_rule,
         'label_interpretation':'Dividend-adjusted chart-price return, not exact reinvested total return',
         'price_basis':'features.npy holds end-of-data-basis prices (raw * multipliers.npy). Model inputs divide each window by its last bar\'s multipliers (point in time: anchor = last input bar); never use stored levels directly.',
         'preprocessing':'No imputation, SMOTE, class balancing, or global fitted scaler. Window-local OHLC axis and volume maximum only.',
