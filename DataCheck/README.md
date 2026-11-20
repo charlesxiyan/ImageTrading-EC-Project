@@ -12,7 +12,8 @@ Step 2 of the data pipeline. No archive is adjusted, prepared or bundled before 
 **Pass criteria for an archive:**
 - the Nasdaq and other groups keep a similar median share of CRSP volume in every year (ratio between 0.7 and 1.4);
 - at least 95% of last-bar closes are within 0.1% of the CRSP close;
-- at least 95% of security-days have their highest bar high and lowest bar low within 0.5% of CRSP's daily high and low.
+- at least 95% of security-days have their highest bar high and lowest bar low within 0.5% of CRSP's daily high and low;
+- at most 0.1% of security-days with CRSP volume have no observed bar at all (a whole empty day points to a wrong symbol mapping).
 
 ```bash
 python DataCheck/check_bar_coverage.py --archive --root ~/"Market Data/US Equity/v4/01_raw"
@@ -21,6 +22,7 @@ python DataCheck/check_sale_conditions.py --date 2023-01-09 --symbols JPM KO AAP
 
 [DATA_REVIEW_2026-11-19.md](DATA_REVIEW_2026-11-19.md) is the review that found the policy version 1 defect.
 [ODD_LOT_PRICES_2026-11-20.md](ODD_LOT_PRICES_2026-11-20.md) is the one that found the policy version 3 price defect.
+[SPLIT_SYMBOLS_2026-11-20.md](SPLIT_SYMBOLS_2026-11-20.md) is the v4 pilot and the 2016 share-class mapping defect it found.
 
 **v1 archive measured on 2026-11-20 with `--archive`.** One session per year; the table gives the median share of CRSP volume kept.
 
