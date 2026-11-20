@@ -6,7 +6,7 @@ Offline. Two layouts:
 - archive (download_us_equity_archive.py, `--archive`): `03_raw_bars_5min/year=/month=/` partitions and the
   CRSP CIZ `05_daily_reference/`. Every `--every`-th session is read (default 21, about one a month), so
   the whole 2016-2025 archive is checked in a few minutes.
-It answers four questions:
+It answers five questions:
 
 1. Are the prices right?   last bar close vs CRSP close, and daily returns vs CRSP daily returns.
 2. How much volume is kept? eligible bar volume / CRSP daily volume, per listing group.
@@ -15,6 +15,9 @@ It answers four questions:
    (archive layout only). Policy version 3 let odd lots reported to a FINRA TRF set bar prices, and a few
    print far from the market: in a 20-stock sample, 59 of 220 security-days had a day high or low more
    than 1% away from CRSP's, none with policy version 4 (see ODD_LOT_PRICES_2026-11-20.md).
+5. Does every security that traded get bars? Security-days with CRSP volume but no observed bar point to a
+   wrong symbol mapping. In 2016 eight Nasdaq share classes (GOOGL, CMCSA, DISCA, ...) were mapped to a
+   symbol that never trades and came out empty on most 2016 days; see SPLIT_SYMBOLS_2026-11-20.md.
 
 NASDAQ 100 membership is used as the Tape C (Nasdaq-listed) group, because NDX members must be
 Nasdaq-listed; the other group is mostly Tape A (NYSE-listed) with some Nasdaq names mixed in.
@@ -143,6 +146,17 @@ def main():
         print(f'   highest bar high and lowest bar low vs CRSP daily high/low: within 0.5% for {within:.1%}, '
               f'more than 1% away for {int((gap > .01).sum())} of {gap.notna().sum()} security-days, max {gap.max():.2%} '
               f'({"pass" if within >= .95 else "FAIL: prints far from the market set bar prices"})')
+    days = bars.groupby(['date', 'permno']).agg(observed=('observed', 'any'), ticker=('ticker', 'last'),
+                                                status=('status', 'first')).reset_index()
+    days = days.merge(crsp[['date', 'permno', 'vol']], on=['date', 'permno'])
+    dark = days[~days.observed & days.vol.gt(0)]
+    share = len(dark)/len(days)
+    print('\n5. Whole days without a bar')
+    print(f'   security-days where CRSP shows volume but no bar was observed: {len(dark)} of {len(days)} '
+          f'({share:.2%}; {"pass" if share <= .001 else "FAIL: check the symbol mapping"})')
+    if len(dark):
+        print(f'   by status: {({k: int(v) for k, v in dark.status.value_counts().items()})}; most frequent: '
+              + ', '.join(f'{t} ({n})' for t, n in dark.ticker.value_counts().head(10).items()))
     if args.archive:
         by_year = daily.assign(year=daily.date.str[:4]).groupby(['year', 'tape_c']).volume_kept.median().unstack()
         by_year.columns = ['other', 'Nasdaq']
