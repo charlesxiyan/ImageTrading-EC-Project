@@ -33,14 +33,37 @@ import pandas as pd
 
 import feature_select as fs
 
-__version__ = "2026-11-24.1"
+__version__ = "2026-11-25.1"   # + VIXY intraday features
 
 VIX_URL = "https://cdn.cboe.com/api/global/us_indices/daily_prices/VIX_History.csv"
 BARS = 78
 VIX_COLS = ["vix_log", "vix_chg1", "vix_chg5", "vix_rel20"]
 RV_COLS = ["rv5d", "rv20d", "rv_ratio"]
 SPY_RV_COLS = ["spy_rv5d", "spy_rv20d"]
+VIXY_COLS = [f"vixy_r{k}" for k in (1, 2, 3, 6, 12)] + [f"vixy_cum{w}" for w in (6, 12, 39, 77)] + \
+    ["vixy_realized_vol", "vixy_mean_abs_r12"]
 GROUPS = {"VIX": VIX_COLS, "multi-day RV": RV_COLS + SPY_RV_COLS}
+
+
+def load_vixy(prepared):
+    """log close of the VIXY add-on panel (tools/build_panel_bundle.py), or None if it is not there."""
+    path = Path(prepared) / "vixy_features.npy"
+    if not path.exists():
+        return None
+    return np.log(np.load(path)[:, 3].astype(np.float64))
+
+
+def vixy_features(vixy_log_close, frame):
+    """VIXY over the same 78-bar input window as the SPY features (bars up to the decision bar only).
+    Stored prices are on one basis, so these bar-to-bar ratios equal the point-in-time ratios."""
+    t = frame.end_index.to_numpy(np.int64)
+    lc = vixy_log_close
+    r = np.stack([lc[t - k + 1] - lc[t - k] for k in range(1, 78)])
+    cols = {f"vixy_r{k}": r[k - 1] for k in (1, 2, 3, 6, 12)}
+    cols.update({f"vixy_cum{w}": lc[t] - lc[t - w] for w in (6, 12, 39, 77)})
+    cols["vixy_realized_vol"] = r.std(axis=0)
+    cols["vixy_mean_abs_r12"] = np.abs(r[:12]).mean(axis=0)
+    return pd.DataFrame(cols)
 
 
 def load_vix(cache, url=VIX_URL):
@@ -126,7 +149,7 @@ def regime_features(store, frame, rv, vixf):
     return out
 
 
-def build(store, cell, settings, rv, vixf):
+def build(store, cell, settings, rv, vixf, vixy=None):
     """Train sample (2016-2022) and validation (2023) frames with 38 + regime features."""
     from chartcnn import build_split
     train, median = build_split(store, "train", cell["target"], cell["horizon"], cell["stride"])
@@ -134,7 +157,10 @@ def build(store, cell, settings, rv, vixf):
     train = train.sample(min(settings["max_train"], len(train)), random_state=settings["seed"]).reset_index(drop=True)
     X = {}
     for k, f in (("train", train), ("valid", valid)):
-        X[k] = pd.concat([fs.features(store, f), regime_features(store, f, rv, vixf)], axis=1)
+        parts = [fs.features(store, f), regime_features(store, f, rv, vixf)]
+        if vixy is not None:
+            parts.append(vixy_features(vixy, f))
+        X[k] = pd.concat(parts, axis=1)
     return dict(train=train, valid=valid), X
 
 

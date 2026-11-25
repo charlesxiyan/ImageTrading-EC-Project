@@ -877,6 +877,7 @@ paired day bootstrap against the 38-feature model. The test years are not used.
 | `+ multi-day RV` | stock realized vol over the last 5 and 20 completed sessions, their ratio, and SPY's 5/20-session RV |
 | `+ VIX + multi-day RV` | both |
 | `regime only` | the 9 regime features alone (no 38) |
+| `+ VIXY intraday` | VIXY over the same 78-bar window as SPY: returns, cumulative returns, realized vol (needs `vixy_panel_v4.zip`) |
 
 VIX comes from Cboe's public daily file (downloaded once, cached in `MindFlow/data/`). Only closes of sessions **before**
 the decision day are used. Realized vol uses intraday 5-minute returns of completed sessions only (no overnight gap,
@@ -890,8 +891,7 @@ print("regime", rg.__version__, "| feature_select", fs.__version__)
 """, gpu=False)
     c += [md("""
 ## 2. Configuration
-**Time (estimate, Colab CPU High-RAM):** realized-vol tables ~2 min; per cell 5 HGB fits on 1,000,000 rows
-~4 min each + bootstrap ~3 min, so ~25 min per cell, ~50 min in all. `QUICK = True`: 300,000 rows, ~15 min.
+**Time (measured, Colab CPU High-RAM):** ~45 min for the 5 feature sets; with the VIXY panel (7 sets) ~60 min. `QUICK = True`: 300,000 rows, ~15 min.
 """), code("""
 SMOKE = LOCAL_TEST
 RUN_ID = None
@@ -915,6 +915,8 @@ sessions = np.unique(store.dates)
 missing = [d for d in sessions if d not in vix.index]
 print(f"bundle sessions without a VIX close: {len(missing)}", missing[:5])
 VIXF = rg.vix_table(vix, sessions)
+VIXY = rg.load_vixy(PREPARED)                     # VIXY intraday features if vixy_panel_v4.zip is in Demo/MindFlow
+print("VIXY intraday features:", "yes" if VIXY is not None else "no (vixy_panel_v4.zip not found)")
 t0 = time.perf_counter()
 RV = rg.rv_tables(store, SETTINGS["min_bars"])
 print(f"realized-vol tables in {(time.perf_counter() - t0) / 60:.1f} min:", {k: v.shape for k, v in RV.items()})
@@ -939,8 +941,8 @@ for cell in CELLS:
         continue
     print("\\n" + "=" * 20, cell["name"], "=" * 20)
     t0 = time.perf_counter()
-    d, X = rg.build(store, cell, SETTINGS, RV, VIXF)
-    base = [c for c in X["train"].columns if c not in sum(rg.GROUPS.values(), [])]
+    d, X = rg.build(store, cell, SETTINGS, RV, VIXF, VIXY)
+    base = [c for c in X["train"].columns if c not in sum(rg.GROUPS.values(), []) + rg.VIXY_COLS]
     print(f"train {len(d['train']):,} | validation {len(d['valid']):,} on {d['valid'].decision_date.nunique()} days | "
           f"{len(base)} base + {X['train'].shape[1] - len(base)} regime features")
     print("missing share of regime features (validation):", X["valid"][sum(rg.GROUPS.values(), [])].isna().mean().round(3).to_dict())
@@ -949,11 +951,14 @@ for cell in CELLS:
                "+ multi-day RV": base + rg.GROUPS["multi-day RV"],
                "+ VIX + multi-day RV": base + sum(rg.GROUPS.values(), []),
                "regime only": sum(rg.GROUPS.values(), [])}
+    if VIXY is not None:
+        subsets["+ VIXY intraday"] = base + rg.VIXY_COLS
+        subsets["+ VIXY intraday + multi-day RV"] = base + rg.VIXY_COLS + rg.GROUPS["multi-day RV"]
     comp, scores, models = rg.compare(d, X, subsets, SETTINGS["seed"], n_boot=50 if SMOKE else 300)
     display(comp.round(4))
     reg = rg.by_regime(d["valid"], scores, X["valid"].vix_log.to_numpy(), list(subsets))
     print("AUC within VIX terciles of 2023 (previous close):"); display(reg.round(4))
-    full = "+ VIX + multi-day RV"
+    full = "+ VIXY intraday + multi-day RV" if VIXY is not None else "+ VIX + multi-day RV"
     _, imp = fs.permutation_importance(models[full], X["valid"][subsets[full]], d["valid"].label.to_numpy(),
                                        1 if SMOKE else 3, SETTINGS["seed"])
     res = dict(comparison=comp, by_regime=reg, importance=imp)
@@ -972,13 +977,15 @@ SUMMARY.to_csv(RUN_DIR / "summary.csv", index=False)
 display(SUMMARY.round(4))
 for name, r in ALL.items():
     imp = r["importance"]
-    reg = imp[imp.feature.isin(sum(rg.GROUPS.values(), []))]
+    reg = imp[imp.feature.isin(sum(rg.GROUPS.values(), []) + rg.VIXY_COLS)]
     print(f"{name}: regime features by permutation importance (2023, full model):")
     display(reg.round(5))
 lines = []
 for name, r in ALL.items():
     t = r["comparison"].set_index("model")
-    for m in ("+ VIX", "+ multi-day RV", "+ VIX + multi-day RV"):
+    for m in ("+ VIX", "+ multi-day RV", "+ VIX + multi-day RV", "+ VIXY intraday", "+ VIXY intraday + multi-day RV"):
+        if m not in t.index:
+            continue
         x = t.loc[m]
         lines.append(f"- {name} {m}: AUC {x.auc:.4f} vs {t.loc['38 hand + SPY'].auc:.4f}, "
                      f"diff {x.diff_vs_ref:+.4f} [{x.diff_low:+.4f}, {x.diff_high:+.4f}] -> {x.verdict}")
