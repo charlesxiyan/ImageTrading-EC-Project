@@ -18,7 +18,7 @@ STOCKS, DAYS, SLOTS = 30, 280, 78
 ORDER = ["Step1a_Daily_JKX_CNN", "Step1b_Daily_Pretrained", "Step2a_Intraday_Direction_Models",
          "Step2b_Intraday_Direction_Pretrained", "Step3a_Intraday_Volatility_Models",
          "Step3b_Intraday_Volatility_Pretrained", "Step4a_Add_Image_Information", "Step4b_Feature_Selection",
-         "Step5_Summary", "Step6a_VIX_Regime"]
+         "Step5_Summary", "Step6a_VIX_Regime", "Step7a_Efficient_Computing"]
 
 
 def fake_prepared(folder):
@@ -140,6 +140,21 @@ def main():
             nbformat.write(nb, WORK / "executed" / "Step3a_retrain_vit.ipynb")
         done = json.loads((here / "runs" / "step3a_volatility_models" / "local_smoke" / "vol_h1" / "done.json").read_text())
         assert "vit" in done.get("retrained", {}), done
+        print("  ok", flush=True)
+    if not ONLY or "Step7a_Efficient_Computing" in ONLY:       # the same notebook on a Step 4a indicator model
+        nb = nbformat.read(NB_DIR / "Step7a_Efficient_Computing.ipynb", as_version=4)
+        for cell in nb.cells:
+            if cell.cell_type == "code" and 'SOURCE = dict(step="3a"' in cell.source:
+                cell.source = cell.source.replace('SOURCE = dict(step="3a", run_id=None, cell="vol_h1", model="plain_spy")',
+                                                  'SOURCE = dict(step="4a", run_id=None, cell="vol_h1", model="ma_ewsd_tab")')
+                cell.source = cell.source.replace("RUN_ID = None", 'RUN_ID = "local_smoke_4a"')
+        out = here / "runs" / "step7a_efficiency" / "local_smoke_4a"
+        out.mkdir(parents=True, exist_ok=True)
+        print("running Step7a again on the Step 4a model ma_ewsd_tab", flush=True)
+        try:
+            NotebookClient(nb, timeout=3600, kernel_name="python3", resources={"metadata": {"path": str(WORK)}}).execute()
+        finally:
+            nbformat.write(nb, WORK / "executed" / "Step7a_indicator_source.ipynb")
         print("  ok", flush=True)
     print("smoke run OK ->", WORK / "executed")
 

@@ -15,6 +15,8 @@ identical rows for every model. Every model reports its parameter count (HGB: tr
 | 4a | Add information to the picture until the image model reaches HGB; is the image still useful? | `Step4a_Add_Image_Information` | ladder: chart → + SPY panel → + fixed-scale EW volatility band → + MA → + 38 numbers; control: the 38 numbers alone (MLP) |
 | 4b | Which of the 38 hand features matter? | `Step4b_Feature_Selection` | HGB: permutation importance, group drop / keep-only, forward selection (chosen on 2022, confirmed on 2023) |
 | 5 | One figure, one parameter table | `Step5_Summary` | reads every step's newest run |
+| 6a | Does market-regime information (VIX, multi-day realized vol, VIXY) help HGB? | `Step6a_VIX_Regime` | HGB with and without regime features, same rows |
+| 7a | Efficient computing for the final model (run after it is chosen) | `Step7a_Efficient_Computing` | float32 / bfloat16 GPU and INT8 CPU inference (static PTQ for CNNs, dynamic for ViTs): AUC, size, latency, memory; DINOv2 ViT-S/14 + LoRA vs full fine-tune, frozen and scratch ViT: trainable parameters, memory, time, AUC |
 
 ## Running on Colab
 
