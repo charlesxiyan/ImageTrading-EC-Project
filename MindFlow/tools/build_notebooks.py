@@ -11,7 +11,7 @@ from pathlib import Path
 HERE = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 from cells import grid_cells, probe_cells, indicator_cells, daily_cells, daily_pretrained_cells, \
-    feature_cells, summary_cells, regime_cells, efficiency_cells  # noqa: E402
+    feature_cells, summary_cells, regime_cells, efficiency_cells, final_cells  # noqa: E402
 
 NOTEBOOKS = {
     "Step1a_Daily_JKX_CNN.ipynb": daily_cells,
@@ -24,6 +24,7 @@ NOTEBOOKS = {
     "Step4b_Feature_Selection.ipynb": feature_cells,
     "Step5_Summary.ipynb": summary_cells,
     "Step6a_VIX_Regime.ipynb": regime_cells,
+    "Step6b_Final_Model.ipynb": final_cells,
     "Step7a_Efficient_Computing.ipynb": efficiency_cells,
 }
 

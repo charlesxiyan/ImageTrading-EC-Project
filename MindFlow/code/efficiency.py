@@ -140,8 +140,9 @@ def load_grid_source(prepared, run_dir, cell_name, arch, smoke=False):
                   fresh=lambda: _wrap_grid(chartcnn.build_model(grid.arch_settings(s, arch))), references=refs)
 
 
-def load_indicator_source(prepared, store, run_dir, cell_name, variant):
-    """A network of a Step 4a indicator run (best checkpoint of `cell_name`/`variant`)."""
+def load_indicator_source(prepared, store, run_dir, cell_name, variant, tab_fn=None):
+    """A network of a Step 4a indicator run or the Step 6b final run (best checkpoint of `cell_name`/`variant`).
+    `tab_fn(store, windows)` gives the raw numbers (default: the 38 hand + SPY numbers of Step 4a)."""
     import indicator_cnn as ic
     run_dir = Path(run_dir)
     s = json.loads((run_dir / "settings.json").read_text())["settings"]
@@ -159,7 +160,7 @@ def load_indicator_source(prepared, store, run_dir, cell_name, variant):
         scaler = ic.TabScaler.__new__(ic.TabScaler)
         st = pre["tab"]
         scaler.columns, scaler.mean, scaler.std = st["columns"], np.asarray(st["mean"]), np.asarray(st["std"])
-        tab = {k: scaler(ic.tab_features(store, W[k])) for k in ("train", "valid")}
+        tab = {k: scaler((tab_fn or ic.tab_features)(store, W[k])) for k in ("train", "valid")}
     n_tab = next(iter(tab.values())).shape[1] if uses_tab else 0
     scale, halflife = tuple(pre["ewsd_log_scale"]), pre.get("halflife", s["halflife"])
 

@@ -28,7 +28,7 @@ torch.backends.cudnn.benchmark = True
 """)
     c += [md("""
 ## 2. Configuration
-**`SOURCE`**: the model to study. `step` is `"3a"` (grid) or `"4a"` (indicator); `run_id=None` takes the newest run of
+**`SOURCE`**: the model to study. `step` is `"6b"` (the final model), `"3a"` (grid) or `"4a"` (indicator); `run_id=None` takes the newest run of
 that step; `cell` is `vol_h1` (5 minutes) or `vol_h12` (60 minutes); `model` is the network name in that run.
 **To resume after a disconnect**, set `RUN_ID` to the printed id and Run all: saved scores and the LoRA checkpoint are reused.
 
@@ -39,7 +39,7 @@ SMOKE = LOCAL_TEST                                # tiny code check on synthetic
 assert DEVICE.type == "cuda" or SMOKE, "Select a GPU runtime (L4)"
 RUN_ID = None                                     # None = new run; or an old RUN_ID to resume it
 SOURCE = dict(step="3a", run_id=None, cell="vol_h1", model="plain_spy")
-# after the final choice, e.g. SOURCE = dict(step="4a", run_id=None, cell="vol_h1", model="ma_ewsd_tab")
+# after Step 6b: SOURCE = dict(step="6b", run_id=None, cell="vol_h1", model=<final_choice.json "final">)
 WORKERS = 0 if SMOKE else min(12, os.cpu_count() or 2)
 EVAL = dict(gpu_every_kth_day=1,                  # GPU variants: every validation day (all rows)
             cpu_every_kth_day=8, cpu_max_rows=30_000,   # CPU variants: a subset of whole days
@@ -76,8 +76,13 @@ assert SRC_DIR is not None, f"no finished Step {SOURCE['step']} run"
 store = chartcnn.Store(PREPARED)
 if SOURCE["step"] in ("2a", "3a"):
     SRC = ef.load_grid_source(PREPARED, SRC_DIR, SOURCE["cell"], SOURCE["model"], smoke=SMOKE)
+elif SOURCE["step"] == "6b":                      # the final model: 38 numbers + multi-day RV
+    import final_model as fm, regime as rg
+    fm.register()
+    RVT = rg.rv_tables(store, 10 if SMOKE else 60)
+    SRC = ef.load_indicator_source(PREPARED, store, SRC_DIR, SOURCE["cell"], SOURCE["model"],
+                                   tab_fn=lambda st, w: fm.numbers(st, w, RVT)[1])
 else:
-    import indicator_cnn as ic
     SRC = ef.load_indicator_source(PREPARED, store, SRC_DIR, SOURCE["cell"], SOURCE["model"])
 TOTAL, _ = ef.count(SRC.model)
 print(f"source: Step {SOURCE['step']} run {SRC_DIR.name}, cell {SOURCE['cell']}, model {SRC.name} = {SRC.label}")
