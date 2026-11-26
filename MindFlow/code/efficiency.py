@@ -6,6 +6,9 @@ grid run or a Step 4a indicator run can be loaded):
   inference   How much smaller and faster does the trained CNN get when it is run in bfloat16 on the
               GPU or quantized to INT8 on the CPU (post-training static quantization, calibrated on
               training windows only), and how much validation AUC does that cost?
+  pipeline    Where does a training step spend its time: drawing the chart on the CPU or the network on the
+              GPU? The charts are almost all background, so they are stored losslessly at 1 bit per pixel
+              (or run-length encoded) and unpacked on the GPU; how much smaller and faster is that?
   training    Can a large pretrained ViT be adapted cheaply? DINOv2 ViT-S/14 (22M parameters) is
               fine-tuned with LoRA (low-rank adapters on the attention projections, ~0.15M trainable
               parameters) on the same rows and inputs as the CNN, and compared with the CNN, the
@@ -33,7 +36,7 @@ import torch.nn.functional as F
 from sklearn.metrics import log_loss, roc_auc_score
 from torch.utils.data import DataLoader, Dataset
 
-__version__ = "2026-11-25.1"
+__version__ = "2026-11-26.1"
 
 IMAGENET = ((0.485, 0.456, 0.406), (0.229, 0.224, 0.225))
 
@@ -556,6 +559,128 @@ def train_step_cost(name, model, batch, device, lr=1e-4, steps=20, warmup=3):
     if device.type == "cuda":
         torch.cuda.empty_cache()
     return out
+
+
+# ----------------------------------------------------------------------------- data pipeline: drawing vs a packed cache
+
+def to_uint8(x):
+    """Float images in [0, 1] -> uint8 0..255 (exact for charts drawn as uint8 / 255)."""
+    return np.rint(np.asarray(x, np.float32) * 255.0).astype(np.uint8)
+
+
+def rle_bytes(img, order="C"):
+    """Bytes of a simple run-length code of one uint8 image: one byte of value + two bytes of length per run
+    (runs longer than 65,535 are split). order "C" runs along rows, "F" down columns (a bar is a column)."""
+    flat = img.reshape(-1, order=order)
+    change = np.flatnonzero(np.diff(flat.astype(np.int16)) != 0)
+    runs = np.diff(np.concatenate([[-1], change, [flat.size - 1]]))
+    return int(3 * np.sum(np.ceil(runs / 65535)))
+
+
+def palette_bits(values):
+    """Bits per pixel needed for a picture with these distinct values."""
+    return max(1, int(np.ceil(np.log2(max(2, len(values))))))
+
+
+def pack_palette(images, palette):
+    """uint8 images [..., H, W] whose values are all in `palette` -> bit planes [..., B, H, ceil(W/8)]."""
+    idx = np.searchsorted(palette, images)
+    assert np.array_equal(palette[np.minimum(idx, len(palette) - 1)], images), "a pixel value outside the palette"
+    nb = palette_bits(palette)
+    return np.stack([np.packbits(((idx >> b) & 1).astype(bool), axis=-1) for b in range(nb)], axis=-3)
+
+
+def image_stats(images):
+    """Per-image storage under each encoding, for a stack of uint8 images [n, H, W]."""
+    import zlib
+    n, h, w = images.shape
+    palette = np.unique(images)
+    packed = pack_palette(images, palette)
+    return dict(height=h, width=w, distinct_values=len(palette), palette=" ".join(map(str, palette.tolist())),
+                bits_per_pixel=palette_bits(palette), ink_share=float((images > 0).mean()),
+                bytes_float32=4 * h * w, bytes_uint8=h * w,
+                bytes_rle_rows=float(np.mean([rle_bytes(im, "C") for im in images])),
+                bytes_rle_columns=float(np.mean([rle_bytes(im, "F") for im in images])),
+                bytes_bitpacked=int(packed[0].nbytes),
+                bytes_bitpacked_zlib=float(np.mean([len(zlib.compress(p.tobytes(), 6)) for p in packed])))
+
+
+def loader_rate(dataset, batch, workers, n_batches, device=None, decode=None):
+    """Images per second delivered by a DataLoader (drawing included for a drawing dataset). With `device`, each
+    batch is also moved there (and decoded there with `decode`, for a cache), as in training."""
+    dl = loader(dataset, batch, workers)
+    seen, t0, it = 0, None, iter(dl)
+    for k in range(n_batches + 1):
+        try:
+            x, t, y, _ = next(it)
+        except StopIteration:
+            break
+        if device is not None:
+            x = x.to(device, non_blocking=True)
+            if decode is not None:
+                x = decode(x)
+            _sync(device)
+        if k == 0:                                            # the first batch pays for worker start-up
+            t0 = time.perf_counter()
+            continue
+        seen += len(y)
+    return seen / (time.perf_counter() - t0) if seen else float("nan")
+
+
+def unpack_bits(packed, width):
+    """uint8 [..., ceil(W/8)] -> uint8 [..., W] in {0, 1}, on whatever device `packed` is (MSB first, as np.packbits)."""
+    shifts = torch.arange(7, -1, -1, device=packed.device, dtype=torch.uint8)
+    bits = (packed.unsqueeze(-1) >> shifts) & 1
+    return bits.flatten(-2)[..., :width]
+
+
+class PackedCharts(Dataset):
+    """Charts drawn once and cached losslessly at `palette_bits` bits per pixel (bit planes of the index of each
+    pixel's value in `palette`). Items are (packed uint8 [C, B, H, ceil(W/8)], tab, label, i); `decode` turns a
+    batch back into the float input, on whatever device it is."""
+
+    def __init__(self, dataset, palette, workers=0, batch=256):
+        self.palette = np.asarray(palette, np.uint8)
+        packed, tabs, ys = [], [], []
+        t0 = time.perf_counter()
+        for x, t, y, _ in loader(dataset, batch, workers):
+            packed.append(pack_palette(to_uint8(x.numpy()), self.palette))
+            tabs.append(t.numpy()); ys.append(y.numpy())
+        self.seconds_to_build = time.perf_counter() - t0
+        self.packed = np.concatenate(packed)
+        self.tab = np.concatenate(tabs).astype(np.float32)
+        self.y = np.concatenate(ys)
+        self.width = int(dataset[0][0].shape[-1])
+        self._lut = {}
+
+    def bytes_per_image(self):
+        return int(self.packed[0].nbytes)
+
+    def decode(self, x):
+        dev = x.device
+        if dev not in self._lut:
+            self._lut[dev] = torch.as_tensor(self.palette, dtype=torch.float32, device=dev) / 255.0
+        planes = unpack_bits(x, self.width).to(torch.int64)          # [N, C, B, H, W]
+        idx = sum(planes[:, :, b] << b for b in range(planes.shape[2]))
+        return self._lut[dev][idx]
+
+    def __len__(self):
+        return len(self.y)
+
+    def __getitem__(self, i):
+        return torch.from_numpy(self.packed[i]), torch.from_numpy(self.tab[i]), int(self.y[i]), int(i)
+
+
+def repay_epochs(build_minutes, drawing_minutes, cached_minutes):
+    """Epochs after which building the cache has paid for itself (inf when the cache saves nothing)."""
+    gain = drawing_minutes - cached_minutes
+    return build_minutes / gain if gain > 1e-9 else float("inf")
+
+
+def epoch_minutes(rows, *rates):
+    """Minutes per epoch of `rows` images when the slowest stage sets the pace (images per second)."""
+    rate = min(r for r in rates if r == r and r > 0)
+    return rows / rate / 60.0
 
 
 # ----------------------------------------------------------------------------- tables

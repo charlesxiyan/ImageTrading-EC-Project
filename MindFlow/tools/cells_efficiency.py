@@ -33,7 +33,7 @@ that step; `cell` is `vol_h1` (5 minutes) or `vol_h12` (60 minutes); `model` is 
 **To resume after a disconnect**, set `RUN_ID` to the printed id and Run all: saved scores and the LoRA checkpoint are reused.
 
 **Time (estimate on an L4, not measured):** inference part 15–25 min; LoRA fine-tuning ~20 min per epoch on 300,000
-windows (up to 3 epochs) plus ~10 min of scoring; training-cost table 5 min. About 1.5–2 hours in all.
+windows (up to 3 epochs) plus ~10 min of scoring; training-cost table 5 min; data-pipeline section ~5 min. About 1.5–2 hours in all.
 """), code("""
 SMOKE = LOCAL_TEST                                # tiny code check on synthetic data; never a result
 assert DEVICE.type == "cuda" or SMOKE, "Select a GPU runtime (L4)"
@@ -52,17 +52,19 @@ LORA = dict(hub="facebook/dinov2-small", r=8, alpha=16, targets=["query", "value
             epochs=3, patience=1, min_delta=1e-5, max_train=300_000, early_stop_every_kth_day=4,
             num_workers=WORKERS, seed=69)
 TRAIN_COST = dict(batch=128, steps=20)
+PIPE = dict(images=4_096, batch=128, loader_batches=30)     # data pipeline section: charts drawn for the measurement
 if SMOKE:
     EVAL.update(cpu_every_kth_day=1, cpu_max_rows=200, vit_cpu_max_rows=50, calibration_windows=32, calib_batch=16,
                 eval_batch=32, n_boot=30)
     BENCH.update(gpu_batches=[1, 8], cpu_batches=[1, 8], reps=3)
     LORA.update(batch_size=16, eval_batch_size=32, epochs=1, max_train=128, warmup_steps=2, early_stop_every_kth_day=1)
     TRAIN_COST.update(batch=8, steps=2)
+    PIPE.update(images=64, batch=8, loader_batches=4)
 RUN_ID, RUN_DIR, RESUME = mf.new_run(HERE, "7a", RUN_ID, "efficiency", LOCAL_TEST)
 RUN_LOCAL = LOCAL_ROOT / "work" / RUN_DIR.parent.name / RUN_ID
 RUN_LOCAL.mkdir(parents=True, exist_ok=True)
 mf.save_settings(RUN_DIR, RESUME, source=SOURCE, eval=EVAL, bench=BENCH, lora=LORA, run_lora=RUN_LORA,
-                 train_cost=TRAIN_COST, efficiency=ef.__version__, torch=torch.__version__,
+                 train_cost=TRAIN_COST, pipe=PIPE, efficiency=ef.__version__, torch=torch.__version__,
                  gpu=torch.cuda.get_device_name() if DEVICE.type == "cuda" else "cpu", cpu_threads=torch.get_num_threads())
 print("RUN_ID:", RUN_ID, "->", RUN_DIR)
 print("CPU threads:", torch.get_num_threads(), "| torch", torch.__version__)
@@ -257,6 +259,65 @@ for name, make in COST_MODELS.items():
 COST = pd.DataFrame(COST)
 COST.to_csv(RUN_DIR / "training_cost.csv", index=False); display(COST.round(3))
 """), md("""
+## 6b. Data pipeline: drawing the chart vs a bit-packed cache
+Training draws every chart on the CPU, every epoch. Is the CPU or the GPU the bottleneck, and what would a cache cost?
+1. **What a chart is**: share of inked pixels, distinct pixel values, and bytes per chart as float32 (what the
+   network reads), uint8, run-length encoding along rows and down columns (a bar is a column), bit planes
+   (1 bit per pixel for a black-and-white chart, 2 bits for up to four grey levels) and bit planes + zlib.
+2. **Rates** (images per second, `WORKERS` CPU workers): the loader that draws charts; the loader that reads the
+   cache, moves it to the GPU and unpacks it there; and one training step of the CNN on the GPU (section 6).
+   An epoch runs at the slowest of the stages it uses.
+3. **Lossless check**: the CNN's scores from cached charts must equal its scores from freshly drawn charts.
+
+A cache does not make the network cheaper; it removes repeated drawing. RLE is listed for size only: a GPU
+convolution needs the dense picture, so every encoding is decoded before the network sees it.
+"""), code("""
+pipe_rows = SRC.train.sample(min(PIPE["images"], len(SRC.train)), random_state=1).reset_index(drop=True)
+DRAWN = SRC.dataset(pipe_rows, "train")
+first = []
+for x, _, _, _ in ef.loader(DRAWN, PIPE["batch"], WORKERS):
+    first.append(ef.to_uint8(x.numpy()[:, 0]))
+    if sum(len(f) for f in first) >= min(512, len(pipe_rows)):
+        break
+STATS = ef.image_stats(np.concatenate(first))
+display(pd.Series(STATS, name="per chart"))
+CACHE = ef.PackedCharts(DRAWN, np.array(STATS["palette"].split(), np.uint8), workers=WORKERS, batch=PIPE["batch"])
+draw_rate = ef.loader_rate(DRAWN, PIPE["batch"], WORKERS, PIPE["loader_batches"], DEVICE)
+cache_rate = ef.loader_rate(CACHE, PIPE["batch"], WORKERS, PIPE["loader_batches"], DEVICE, decode=CACHE.decode)
+cnn_cost = COST[COST.model == f"{SRC.label} (from scratch)"]
+gpu_rate = float(cnn_cost.images_per_s.iloc[0]) if len(cnn_cost) and "images_per_s" in cnn_cost else float("nan")
+# lossless: the trained CNN scores the same rows from both sources
+m = SRC.model.to(DEVICE).eval()
+diffs = []
+with torch.no_grad():
+    for (xa, ta, _, _), (xb, tb, _, _) in zip(ef.loader(DRAWN, PIPE["batch"], 0), ef.loader(CACHE, PIPE["batch"], 0)):
+        pa = torch.softmax(m(xa.to(DEVICE).float(), ta.to(DEVICE)).float(), 1)[:, 1]
+        pb = torch.softmax(m(CACHE.decode(xb.to(DEVICE)), tb.to(DEVICE)).float(), 1)[:, 1]
+        diffs.append(float((pa - pb).abs().max()))
+        if len(diffs) >= 4:
+            break
+n_train = len(SRC.train)
+PIPELINE = pd.DataFrame([
+    dict(stage="draw charts on the CPU (loader, to GPU)", images_per_s=draw_rate),
+    dict(stage=f"read cache ({STATS['bits_per_pixel']} bit/pixel), to GPU, unpack there", images_per_s=cache_rate),
+    dict(stage="CNN training step on the GPU (section 6, chart given)", images_per_s=gpu_rate)])
+display(PIPELINE.round(1))
+PIPE_SUMMARY = dict(
+    workers=WORKERS, training_rows=n_train, cache_bytes_per_chart=CACHE.bytes_per_image(),
+    cache_gb_all_training_rows=n_train * CACHE.bytes_per_image() / 2**30,
+    float32_gb_all_training_rows=n_train * STATS["bytes_float32"] / 2**30,
+    minutes_to_build_cache=n_train * CACHE.seconds_to_build / len(CACHE) / 60,
+    epoch_minutes_drawing=ef.epoch_minutes(n_train, draw_rate, gpu_rate),
+    epoch_minutes_cached=ef.epoch_minutes(n_train, cache_rate, gpu_rate),
+    bottleneck_now="CPU drawing" if draw_rate < gpu_rate else "GPU",
+    max_score_difference_cached_vs_drawn=max(diffs) if diffs else float("nan"))
+PIPE_SUMMARY["epochs_to_repay_cache"] = ef.repay_epochs(PIPE_SUMMARY["minutes_to_build_cache"],
+                                                        PIPE_SUMMARY["epoch_minutes_drawing"], PIPE_SUMMARY["epoch_minutes_cached"])
+pd.DataFrame([STATS]).to_csv(RUN_DIR / "chart_storage.csv", index=False)
+PIPELINE.to_csv(RUN_DIR / "pipeline_rates.csv", index=False)
+mf_json = RUN_DIR / "pipeline_summary.json"; mf_json.write_text(json.dumps(PIPE_SUMMARY, indent=2, default=float))
+display(pd.Series(PIPE_SUMMARY, name="all training rows"))
+"""), md("""
 ## 7. Summary
 One row per deployable form of each model: validation AUC (on the rows it was scored on, with the paired difference to
 the float32 model), size on disk and speed.
@@ -316,6 +377,16 @@ for _, r in COST.iterrows():
     if "ms_per_step" in r and not pd.isna(r.get("ms_per_step")):
         lines.append(f"- training {r.model}: {int(r.trainable):,} trainable, {r.ms_per_step:.0f} ms/step at batch {int(r.batch)}, "
                      f"peak GPU memory {r.peak_train_memory_mb:,.0f} MB")
+if "PIPE_SUMMARY" in globals():
+    P = PIPE_SUMMARY
+    lines.append(f"- chart storage: {STATS['ink_share']:.1%} of pixels inked, {STATS['distinct_values']} values; "
+                 f"{STATS['bytes_float32']:,} B as float32, {STATS['bytes_uint8']:,} B uint8, RLE {STATS['bytes_rle_rows']:,.0f} B along rows / "
+                 f"{STATS['bytes_rle_columns']:,.0f} B down columns, {STATS['bytes_bitpacked']:,} B at {STATS['bits_per_pixel']} bit/pixel, "
+                 f"{STATS['bytes_bitpacked_zlib']:,.0f} B with zlib")
+    lines.append(f"- pipeline ({P['workers']} workers): drawing {draw_rate:,.0f}/s, cache {cache_rate:,.0f}/s, CNN step {gpu_rate:,.0f}/s "
+                 f"-> bottleneck now: {P['bottleneck_now']}; epoch {P['epoch_minutes_drawing']:.1f} min drawing vs "
+                 f"{P['epoch_minutes_cached']:.1f} min cached; cache {P['cache_gb_all_training_rows']:.2f} GB, built in "
+                 f"{P['minutes_to_build_cache']:.0f} min; max score difference {P['max_score_difference_cached_vs_drawn']:.1e}")
 TAKEAWAYS = "\\n".join(lines)
 (RUN_DIR / "takeaways.md").write_text(TAKEAWAYS + "\\n"); display(Markdown(TAKEAWAYS))
 """), md("""
