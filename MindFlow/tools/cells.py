@@ -18,7 +18,7 @@ FLOW = """
 | **4** | Add information to the picture step by step until the image model reaches HGB; is the image still useful beyond the features; which features matter? | `Step4a_Add_Image_Information`, `Step4b_Feature_Selection` |
 | **5** | One figure and one parameter table over all steps | `Step5_Summary` |
 | **6** | Next questions: does market-regime information (VIX, multi-day realized volatility) help? | `Step6a_VIX_Regime`, `Step6b_Final_Model` (final model + held-out test), `Step6c_Volatility_Use` (IC, long-short, risk sizing) |
-| **7** | Efficient computing for the final model: 16-bit / INT8 inference, LoRA fine-tuning of a pretrained ViT | `Step7a_Efficient_Computing` |
+| **7** | Efficient computing for the final model: 16-bit / INT8 inference, LoRA fine-tuning of a pretrained ViT | `Step7a_Efficient_Computing`, `Step7b_Distillation` (small students taught by the final CNN) |
 """
 
 
@@ -344,3 +344,4 @@ from cells_intraday import grid_cells, probe_cells, indicator_cells, feature_cel
 from cells_efficiency import efficiency_cells  # noqa: E402,F401
 from cells_final import final_cells  # noqa: E402,F401
 from cells_vol_use import vol_use_cells  # noqa: E402,F401
+from cells_distill import distill_cells  # noqa: E402,F401
