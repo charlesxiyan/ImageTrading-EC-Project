@@ -1,0 +1,11 @@
+check,a,b,cell,diff,low,high,verdict
+"distillation, small CNN","small pure-image CNN 16-32-64, distilled","small pure-image CNN 16-32-64, labels",vol_h1,0.0026197021210316316,0.0019291365882487532,0.003361355939226259,better
+"distillation, small CNN on the half-height picture","small pure-image CNN, half-height picture, distilled","small pure-image CNN, half-height picture, labels",vol_h1,0.00042304209479335664,-0.0002031006736574692,0.0009707710169454403,tied
+distilled small CNN vs the teacher (6d pure_all),"small pure-image CNN 16-32-64, distilled","teacher: pure image, all numbers drawn (6d)",vol_h1,-0.00017998338303135204,-0.0005794701420651999,0.00019372771934484377,tied
+distilled half-height CNN vs the teacher,"small pure-image CNN, half-height picture, distilled","teacher: pure image, all numbers drawn (6d)",vol_h1,-0.00045077156686711785,-0.0010632700287726948,0.00022078721698125803,tied
+distilled tiny CNN vs the teacher,"tiny pure-image CNN 8-16-32, distilled","teacher: pure image, all numbers drawn (6d)",vol_h1,-0.0013340101627608392,-0.001871808106720671,-0.0007817238156065779,worse
+half-height vs full picture (both distilled),"small pure-image CNN, half-height picture, distilled","small pure-image CNN 16-32-64, distilled",vol_h1,-0.00027078818383576583,-0.0009833702709102139,0.0005445204259774438,tied
+tiny vs small (both distilled),"tiny pure-image CNN 8-16-32, distilled","small pure-image CNN 16-32-64, distilled",vol_h1,-0.0011540267797294872,-0.0015923215945293418,-0.0006040398505396408,worse
+distilled small CNN vs HGB 43,"small pure-image CNN 16-32-64, distilled",HGB 43 (6b),vol_h1,-0.00020469566322674752,-0.0020381322445384596,0.001489783198503991,tied
+distilled half-height CNN vs HGB 43,"small pure-image CNN, half-height picture, distilled",HGB 43 (6b),vol_h1,-0.00047548384706251335,-0.002195399467366113,0.0011880826779167282,tied
+distilled small pure-image CNN vs the 6b final model (image + numbers),"small pure-image CNN 16-32-64, distilled","final model, image + numbers (6b)",vol_h1,0.0010556072915535964,-0.0009105175872631571,0.002824770791377253,tied
