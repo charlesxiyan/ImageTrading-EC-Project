@@ -24,7 +24,7 @@ import indicator_cnn as ic
 import pure_image as pi
 from indicator_cnn import autocast
 
-__version__ = "2026-11-27.1"
+__version__ = "2026-11-27.2"
 
 PRICE_ROWS = ic.SIZE - ic.SIZE // 5 - 1          # 187: price area of the chart (then a blank row, then volume)
 MARKER = pi.MARKER / 255.0
@@ -159,22 +159,40 @@ def mean_picture(X, variant, batch=2048):
     return (s / len(X) / 255.0).float()[None, None]
 
 
-def drop_table(frame, scores, ops, n_boot, cell="2023"):
-    """AUC under each op and its drop from the unchanged picture, with 95% paired day-bootstrap intervals."""
+def _log_loss(y, p):
+    p = np.clip(np.asarray(p, np.float64), 1e-7, 1 - 1e-7)
+    return float(-np.mean(y * np.log(p) + (1 - y) * np.log(1 - p)))
+
+
+def drop_table(frame, scores, ops, n_boot, cell="2023", seed=0):
+    """Per op: AUC and its drop, log loss and its rise, Brier score, each against the unchanged picture,
+    with 95% paired day-bootstrap intervals (the same day draws for AUC and log loss)."""
     pred = frame[["decision_date", "label"]].copy()
     names = ["base"] + [n for n, *_ in ops]
     for n in names:
         pred[f"score_{n.replace(':', '__')}"] = scores[n]
-    boot = ic.day_bootstrap(pred, [n.replace(":", "__") for n in names], n_boot)
-    y = pred.label.to_numpy()
+    boot = ic.day_bootstrap(pred, [n.replace(":", "__") for n in names], n_boot, seed)
+    y = pred.label.to_numpy().astype(np.float64)
+    codes, _ = pd.factorize(pred.decision_date)
+    days = [np.flatnonzero(codes == d) for d in range(codes.max() + 1)]
+    rng = np.random.default_rng(seed)
+    draws = [np.concatenate([days[i] for i in rng.integers(0, len(days), len(days))]) for _ in range(n_boot)]
     base = ic._auc(y, scores["base"])
+    base_ll = _log_loss(y, scores["base"])
+    base_draws = np.array([_log_loss(y[i], scores["base"][i]) for i in draws])
     rows = []
     for n, group, label, _ in ops:
         d = (boot["base"] - boot[n.replace(":", "__")]).to_numpy()
         lo, hi = np.nanpercentile(d, [2.5, 97.5])
+        ll = _log_loss(y, scores[n])
+        r = np.array([_log_loss(y[i], scores[n][i]) for i in draws]) - base_draws
+        llo, lhi = np.nanpercentile(r, [2.5, 97.5])
         rows.append(dict(op=n, group=group, part=label, auc=ic._auc(y, scores[n]), drop=base - ic._auc(y, scores[n]),
-                         low=lo, high=hi, verdict="matters" if lo > 0 else "hurts" if hi < 0 else "no effect"))
-    return base, pd.DataFrame(rows)
+                         low=lo, high=hi, verdict="matters" if lo > 0 else "hurts" if hi < 0 else "no effect",
+                         log_loss=ll, log_loss_rise=ll - base_ll, ll_low=llo, ll_high=lhi,
+                         ll_verdict="matters" if llo > 0 else "hurts" if lhi < 0 else "no effect",
+                         brier=float(np.mean((np.asarray(scores[n]) - y) ** 2))))
+    return dict(auc=base, log_loss=base_ll, brier=float(np.mean((np.asarray(scores["base"]) - y) ** 2))), pd.DataFrame(rows)
 
 
 # ----------------------------------------------------------------------------- activation x weight
