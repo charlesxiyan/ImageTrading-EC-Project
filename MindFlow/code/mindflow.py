@@ -32,7 +32,7 @@ STEP_FOLDERS = {
     "2a": "step2a_direction_models", "2b": "step2b_direction_pretrained",
     "3a": "step3a_volatility_models", "3b": "step3b_volatility_pretrained",
     "4a": "step4a_image_information", "4b": "step4b_feature_selection",
-    "5": "step5_summary", "6a": "step6a_vix_regime", "6b": "step6b_final_model", "6c": "step6c_volatility_use", "6d": "step6d_pure_image", "7a": "step7a_efficiency", "7b": "step7b_distillation",
+    "5": "step5_summary", "6a": "step6a_vix_regime", "6b": "step6b_final_model", "6c": "step6c_volatility_use", "6d": "step6d_pure_image", "6e": "step6e_pure_image_60min", "7a": "step7a_efficiency", "7b": "step7b_distillation", "7b+": "step7b_plus_pure_distillation",
 }
 
 

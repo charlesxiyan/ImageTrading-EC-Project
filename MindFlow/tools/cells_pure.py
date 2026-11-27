@@ -2,8 +2,12 @@
 from cells import code, header, md, setup
 
 
-def pure_cells():
-    c = [header("6d", "A pure-image model", "The project started from one idea: can a machine read the chart the way a "
+def pure_cells(step="6d", horizons="[1]", variants='["pure_key", "pure_all"]'):
+    intro = "" if step == "6d" else (
+        "**Step 6e = Step 6d at 60 minutes.** Same code and pictures; the strip scales are fitted again on the same "
+        "training windows (identical to 6d's), the comparison is with Step 6b's and 4a's 60-minute scores. Run it after "
+        "Step 7b+. By default only `pure_all` (the full picture); add `pure_key` to `VARIANTS` for the key strips.\n\n")
+    c = [header(step, "A pure-image model" + (" at 60 minutes" if step != "6d" else ""), "The project started from one idea: can a machine read the chart the way a "
                 "trader does? The final model (6b) reaches HGB only with 43 numbers as a second input. If what those "
                 "numbers know is drawn into the picture instead, can a CNN that sees nothing but the picture do as well?", """
 **Why it might work.** The chart is stretched to each window's own low and high, so no level is visible in it. The one
@@ -41,14 +45,16 @@ a disconnect**, set `RUN_ID` to the printed id and Run all: finished variants ar
 
 **Time (estimate on an L4, from Step 6b's ~45–60 min per image variant and cell):** the canvas is 35–50% taller, so
 ~60–90 min per variant and cell: ~2.5–3 hours for both variants at 5 minutes, ~5–6 hours with 60 minutes too.
-`HORIZONS = [1]` (5 minutes) by default; add 12 for 60 minutes. High-RAM is needed for the realized-volatility tables.
+`HORIZONS`: 1 = 5 minutes, 12 = 60 minutes (one 60-minute cell takes about as long as one 5-minute cell). High-RAM is needed for the realized-volatility tables.
 """), code("""
 SMOKE = LOCAL_TEST
 assert DEVICE.type == "cuda" or SMOKE, "Select a GPU runtime (L4 or A100)"
 RUN_ID = None
 STEP6B_RUN = None
-HORIZONS = [1]
-VARIANTS = ["pure_key", "pure_all"]                # run order
+HORIZONS = {horizons}
+VARIANTS = {variants}                # run order
+if SMOKE:
+    HORIZONS = [1]                                 # the synthetic smoke run of Step 6b has 5 minutes only
 STEP6B_DIR = mf.latest_run(HERE, "6b", STEP6B_RUN)
 assert STEP6B_DIR is not None, "run Step 6b first"
 S6 = json.loads((STEP6B_DIR / "settings.json").read_text())
@@ -58,7 +64,7 @@ SETTINGS.update(num_workers=0 if SMOKE else min(12, os.cpu_count() or 2))
 CELLS = [c for c in S6["cells"] if c["horizon"] in HORIZONS
          and (STEP6B_DIR / c["name"] / "predictions_with_references.parquet").exists()]
 assert CELLS, f"no finished Step 6b cell for horizons {HORIZONS}"
-RUN_ID, RUN_DRIVE, RESUME = mf.new_run(HERE, "6d", RUN_ID, "pure", LOCAL_TEST)
+RUN_ID, RUN_DRIVE, RESUME = mf.new_run(HERE, "{step}", RUN_ID, "pure", LOCAL_TEST)
 RUN_LOCAL = LOCAL_ROOT / "work" / RUN_DRIVE.parent.name / RUN_ID
 RUN_LOCAL.mkdir(parents=True, exist_ok=True)
 mf.save_settings(RUN_DRIVE, RESUME, settings=SETTINGS, variants=VARIANTS, cells=CELLS, step6b=STEP6B_DIR.name,
@@ -213,4 +219,7 @@ if RUN_TEST:
     TEST_TABLE.to_csv(RUN_DRIVE / "test_table.csv", index=False); TEST_CHECK.to_csv(RUN_DRIVE / "test_checks.csv", index=False)
     display(TEST_TABLE.pivot_table(index="model", columns="cell", values="roc_auc").round(4)); display(TEST_CHECK.round(4))
 """)]
+    for cell in c:
+        cell["source"] = (cell["source"].replace("{horizons}", horizons).replace("{variants}", variants)
+                          .replace('"{step}"', f'"{step}"'))
     return c
