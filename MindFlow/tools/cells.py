@@ -19,6 +19,7 @@ FLOW = """
 | **5** | One figure and one parameter table over all steps | `Step5_Summary` |
 | **6** | Next questions: does market-regime information (VIX, multi-day realized volatility) help? | `Step6a_VIX_Regime`, `Step6b_Final_Model` (final model + held-out test), `Step6c_Volatility_Use` (IC, long-short, risk sizing), `Step6d_Pure_Image` (the numbers drawn into the picture, no numbers input), `Step6e_Pure_Image_60min` |
 | **7** | Efficient computing for the final model: 16-bit / INT8 inference, LoRA fine-tuning of a pretrained ViT | `Step7a_Efficient_Computing`, `Step7b_Distillation` (small students taught by the final CNN), `Step7b_plus_Pure_Image_Distillation` (small pure-image students taught by the 6d pure-image CNN) |
+| **8** | What did the pure-image CNN learn? (occlusion, activation x weight, saliency, probing; no training) | `Step8a_Inside_Pure_CNN` |
 """
 
 
@@ -347,3 +348,4 @@ from cells_vol_use import vol_use_cells  # noqa: E402,F401
 from cells_distill import distill_cells  # noqa: E402,F401
 from cells_pure import pure_cells  # noqa: E402,F401
 from cells_pure_distill import pure_distill_cells  # noqa: E402,F401
+from cells_inside import inside_cells  # noqa: E402,F401

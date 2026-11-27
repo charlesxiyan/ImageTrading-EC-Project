@@ -11,7 +11,7 @@ from pathlib import Path
 HERE = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 from cells import grid_cells, probe_cells, indicator_cells, daily_cells, daily_pretrained_cells, \
-    feature_cells, summary_cells, regime_cells, efficiency_cells, final_cells, vol_use_cells, distill_cells, pure_cells, pure_distill_cells  # noqa: E402
+    feature_cells, summary_cells, regime_cells, efficiency_cells, final_cells, vol_use_cells, distill_cells, pure_cells, pure_distill_cells, inside_cells  # noqa: E402
 
 NOTEBOOKS = {
     "Step1a_Daily_JKX_CNN.ipynb": daily_cells,
@@ -31,6 +31,7 @@ NOTEBOOKS = {
     "Step7a_Efficient_Computing.ipynb": efficiency_cells,
     "Step7b_Distillation.ipynb": distill_cells,
     "Step7b_plus_Pure_Image_Distillation.ipynb": pure_distill_cells,
+    "Step8a_Inside_Pure_CNN.ipynb": inside_cells,
 }
 
 

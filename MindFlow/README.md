@@ -18,6 +18,7 @@ identical rows for every model. Every model reports its parameter count (HGB: tr
 | 6a | Does market-regime information (VIX, multi-day realized vol, VIXY) help HGB? | `Step6a_VIX_Regime` | HGB with and without regime features, same rows |
 | 6d | Can a model that sees only pictures reach the final model if the numbers are drawn into the picture? | `Step6d_Pure_Image` | CNN on chart + EWSD + fixed-scale strips (time of day, SPY volatility, volume, multi-day RV), with and without all 43 numbers drawn as bars; no numbers input; paired with 6b and 4a |
 | 7a | Efficient computing for the final model (run after it is chosen) | `Step7a_Efficient_Computing` | float32 / bfloat16 GPU and INT8 CPU inference (static PTQ for CNNs, dynamic for ViTs): AUC, size, latency, memory; DINOv2 ViT-S/14 + LoRA vs full fine-tune, frozen and scratch ViT: trainable parameters, memory, time, AUC |
+| 8a | What did the pure-image CNN learn? | `Step8a_Inside_Pure_CNN` | Fixed Step 6d models on 2023 pictures: region / time / number-strip occlusion, activation × weight and channel ablation, Grad-CAM and gradient × input, linear probing of the 43 numbers; no training |
 
 ## Running on Colab
 
@@ -39,6 +40,7 @@ identical rows for every model. Every model reports its parameter count (HGB: tr
 - `indicator_cnn.py` chart variants (MA, EW volatility band), hybrid CNN + feature MLP, the features-only control
 - `feature_select.py` HGB feature selection
 - `pure_image.py` pure-image pictures (the numbers drawn on fixed scales) and their CNN (Step 6d)
+- `inside_cnn.py` what the pure-image CNN uses: occlusion, activation × weight, saliency, probing (Step 8a)
 - `mindflow.py` shared setup, run discovery, parameter tables, summary figure
 
 ## Repository QA

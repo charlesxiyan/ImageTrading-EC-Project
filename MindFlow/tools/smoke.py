@@ -19,7 +19,7 @@ ORDER = ["Step1a_Daily_JKX_CNN", "Step1b_Daily_Pretrained", "Step2a_Intraday_Dir
          "Step2b_Intraday_Direction_Pretrained", "Step3a_Intraday_Volatility_Models",
          "Step3b_Intraday_Volatility_Pretrained", "Step4a_Add_Image_Information", "Step4b_Feature_Selection",
          "Step5_Summary", "Step6a_VIX_Regime", "Step6b_Final_Model", "Step6c_Volatility_Use", "Step6d_Pure_Image", "Step6e_Pure_Image_60min", "Step7a_Efficient_Computing",
-         "Step7b_Distillation", "Step7b_plus_Pure_Image_Distillation"]
+         "Step7b_Distillation", "Step7b_plus_Pure_Image_Distillation", "Step8a_Inside_Pure_CNN"]
 
 
 def fake_prepared(folder):
