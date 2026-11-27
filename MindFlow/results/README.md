@@ -18,5 +18,6 @@ Step 5 summarised.
 | 5 summary | `step5_summary` | one figure and parameter table over steps 1-4 |
 | 6a regime | `step6a_vix_regime/regime_20261124_182927` | daily VIX adds nothing; multi-day realized vol +0.0025 (significant) |
 | 6d pure image | `step6d_pure_image/pure_20261127_023749` | CNN with no numbers input, numbers drawn on fixed scales: key strips 0.6866 (ties final 0.6881); all 43 drawn 0.6894 = HGB 43 |
+| 8a inside the pure-image CNN | `step8a_inside_pure_cnn/inside_20261127_063450` | 19,762 val rows, fixed 6d models: session-open line is the most important single element (erase -0.017 / -0.024 AUC); whole chart -0.052 / -0.087; newest and oldest 6 bars matter, middle bars ~0; features encode volatility, volume and time of day, not direction |
 
 Steps 6b (final model) and 7a (efficient computing) are added when their runs finish.
