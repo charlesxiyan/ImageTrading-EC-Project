@@ -23,7 +23,7 @@ import indicator_cnn as ic
 import pure_image as pi
 from chartcnn.models import ChartCNN
 
-__version__ = "2026-11-27.1"
+__version__ = "2026-11-27.2"
 
 # name: (CNN channels, halve the picture's height, alpha or None = settings["kd_alpha"])
 STUDENTS = {
@@ -112,11 +112,21 @@ def run_student(name, prepared, data, settings, device, local_dir, drive_dir=Non
     print(f"  --- {LABELS[name]} ({name}): {n['total']:,} parameters; alpha {alpha}, T {settings['kd_temperature']}")
     bs, ebs = settings["batch_size"], settings["eval_batch_size"]
     t0 = time.perf_counter()
-    history = kd.fit(model, loader(prepared, data, "train", "train", settings, True, bs), data["z_train"],
-                     loader(prepared, data, "es", "valid", settings, False, ebs), data["es"].label.to_numpy(),
-                     settings, alpha, device, local_dir, drive_dir)
+    trained = (home / "best.pt").exists() and (home / "history.csv").exists() and not (home / "last.pt").exists()
+    if trained:                                   # training finished in an earlier session; only scoring is left
+        print(f"  {name}: training already finished (best.pt, history.csv), scoring only")
+        if not (local_dir / "best.pt").exists():
+            ic.shutil.copy2(home / "best.pt", local_dir / "best.pt")
+        history = pd.read_csv(home / "history.csv")
+    else:
+        history = kd.fit(model, loader(prepared, data, "train", "train", settings, True, bs), data["z_train"],
+                         loader(prepared, data, "es", "valid", settings, False, ebs), data["es"].label.to_numpy(),
+                         settings, alpha, device, local_dir, drive_dir)
     model.load_state_dict(torch.load(local_dir / "best.pt", map_location=device, weights_only=False)["model"])
+    print(f"  {name}: scoring {len(data['valid']):,} validation windows ...", flush=True)
+    t1 = time.perf_counter()
     p = ic.predict(model, loader(prepared, data, "valid", "valid", settings, False, ebs), device, settings["amp"])
+    print(f"  {name}: scored in {(time.perf_counter() - t1) / 60:.1f} min", flush=True)
     info = dict(parameters=n, alpha=alpha, temperature=settings["kd_temperature"],
                 best_epoch=int(history.loc[history.es_log_loss.idxmin(), "epoch"]),
                 minutes=(time.perf_counter() - t0) / 60, epochs=int(history.epoch.max()))
