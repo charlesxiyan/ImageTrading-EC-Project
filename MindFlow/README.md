@@ -16,6 +16,7 @@ identical rows for every model. Every model reports its parameter count (HGB: tr
 | 4b | Which of the 38 hand features matter? | `Step4b_Feature_Selection` | HGB: permutation importance, group drop / keep-only, forward selection (chosen on 2022, confirmed on 2023) |
 | 5 | One figure, one parameter table | `Step5_Summary` | reads every step's newest run |
 | 6a | Does market-regime information (VIX, multi-day realized vol, VIXY) help HGB? | `Step6a_VIX_Regime` | HGB with and without regime features, same rows |
+| 6d | Can a model that sees only pictures reach the final model if the numbers are drawn into the picture? | `Step6d_Pure_Image` | CNN on chart + EWSD + fixed-scale strips (time of day, SPY volatility, volume, multi-day RV), with and without all 43 numbers drawn as bars; no numbers input; paired with 6b and 4a |
 | 7a | Efficient computing for the final model (run after it is chosen) | `Step7a_Efficient_Computing` | float32 / bfloat16 GPU and INT8 CPU inference (static PTQ for CNNs, dynamic for ViTs): AUC, size, latency, memory; DINOv2 ViT-S/14 + LoRA vs full fine-tune, frozen and scratch ViT: trainable parameters, memory, time, AUC |
 
 ## Running on Colab
@@ -37,6 +38,7 @@ identical rows for every model. Every model reports its parameter count (HGB: tr
 - `pretrained_ts.py`, `tsfm_compare/` time-series foundation models (zero-shot), contexts and scores
 - `indicator_cnn.py` chart variants (MA, EW volatility band), hybrid CNN + feature MLP, the features-only control
 - `feature_select.py` HGB feature selection
+- `pure_image.py` pure-image pictures (the numbers drawn on fixed scales) and their CNN (Step 6d)
 - `mindflow.py` shared setup, run discovery, parameter tables, summary figure
 
 ## Repository QA
