@@ -1,0 +1,8 @@
+check,a,b,cell,diff,low,high,verdict
+key strips added to the chart + EWSD picture (both image only),"pure image: chart + EWSD + time, SPY vol, volume, multi-day RV (no numbers)","chart + EWSD, image only (4a)",vol_h1,0.008912184800163035,0.006629998076780497,0.011213886622744992,better
+all 43 numbers drawn vs the key strips,pure image: pure_key + all 43 numbers drawn as bars (no numbers input),"pure image: chart + EWSD + time, SPY vol, volume, multi-day RV (no numbers)",vol_h1,0.0027368055704515763,0.0016052826491372157,0.0038340330085681073,better
+pure image (key) vs the final model (image + numbers input),"pure image: chart + EWSD + time, SPY vol, volume, multi-day RV (no numbers)",final model (6b): image + 43 numbers,vol_h1,-0.001501214895866628,-0.003382408544958748,0.0005150996609336314,tied
+pure image (all) vs the final model (image + numbers input),pure image: pure_key + all 43 numbers drawn as bars (no numbers input),final model (6b): image + 43 numbers,vol_h1,0.0012355906745849484,-0.0005978336453025202,0.0028665230039760996,tied
+pure image (key) vs HGB 43,"pure image: chart + EWSD + time, SPY vol, volume, multi-day RV (no numbers)",HGB 43 (6b),vol_h1,-0.002761517850646972,-0.0046855199856230935,-0.0007997248267500084,worse
+pure image (all) vs HGB 43,pure image: pure_key + all 43 numbers drawn as bars (no numbers input),HGB 43 (6b),vol_h1,-2.471228019539547e-05,-0.0016531446929511195,0.001511251101457558,tied
+pure image (all) vs the 43-number MLP,pure image: pure_key + all 43 numbers drawn as bars (no numbers input),43-number MLP (6b),vol_h1,0.0015162915201790527,-0.0005308617384798514,0.0033181294368214787,tied

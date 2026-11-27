@@ -17,5 +17,6 @@ Step 5 summarised.
 | 4b feature selection | `step4b_feature_selection/features_20261123_083258` | 3-feature subset worse than all 38 on 2023, so all 38 kept |
 | 5 summary | `step5_summary` | one figure and parameter table over steps 1-4 |
 | 6a regime | `step6a_vix_regime/regime_20261124_182927` | daily VIX adds nothing; multi-day realized vol +0.0025 (significant) |
+| 6d pure image | `step6d_pure_image/pure_20261127_023749` | CNN with no numbers input, numbers drawn on fixed scales: key strips 0.6866 (ties final 0.6881); all 43 drawn 0.6894 = HGB 43 |
 
 Steps 6b (final model) and 7a (efficient computing) are added when their runs finish.
