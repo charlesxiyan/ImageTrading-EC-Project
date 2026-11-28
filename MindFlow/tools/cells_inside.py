@@ -124,15 +124,23 @@ for v in MODELS:
         print(f"{v}: our scores vs Step 6d's saved scores on the same rows: correlation {r:.5f}")
     BASE[v], OCC[v] = icn.drop_table(ROWS, scores, ops, N_BOOT)
     OCC[v].assign(model=v).to_csv(RUN_DRIVE / f"occlusion_{v}.csv", index=False)
-    print(f"{v}: AUC on these rows {BASE[v]:.4f}; {len(ops)} occlusions in {(time.perf_counter() - t1) / 60:.1f} min")
+    keep = ROWS[["security_index", "end_index", "decision_date", "label"]].reset_index(drop=True)
+    pd.concat([keep, pd.DataFrame({f"p_{k}": np.asarray(x, np.float32) for k, x in scores.items()})], axis=1) \
+        .to_parquet(RUN_DRIVE / f"occlusion_scores_{v}.parquet", index=False)      # per-row probabilities, every op
+    b = BASE[v]
+    print(f"{v}: on these rows AUC {b['auc']:.4f}, log loss {b['log_loss']:.4f}, Brier {b['brier']:.4f}; "
+          f"{len(ops)} occlusions in {(time.perf_counter() - t1) / 60:.1f} min")
 
-def show(group_prefix):
+def show(group_prefix, value="drop"):
     t = pd.concat([OCC[v].assign(model=v) for v in MODELS])
     t = t[t.group.str.startswith(group_prefix)]
-    return t.pivot_table(index="part", columns="model", values="drop").round(4).sort_values(MODELS[0], ascending=False)
-display(show("region")); display(show("erase"))
+    return t.pivot_table(index="part", columns="model", values=value).round(4).sort_values(MODELS[0], ascending=False)
+print("AUC drop:"); display(show("region")); display(show("erase"))
+print("log loss rise (higher = the model needs that part to give good probabilities):")
+display(show("region", "log_loss_rise")); display(show("erase", "log_loss_rise"))
 for v in MODELS:
-    display(OCC[v][OCC[v].group.str.startswith(("region", "erase"))][["part", "group", "auc", "drop", "low", "high", "verdict"]].round(4))
+    display(OCC[v][OCC[v].group.str.startswith(("region", "erase"))][["part", "group", "auc", "drop", "low", "high", "verdict",
+                                                                      "log_loss", "log_loss_rise", "ll_low", "ll_high", "ll_verdict"]].round(4))
 """), code("""
 fig, axes = plt.subplots(1, 3, figsize=(17, 5), gridspec_kw=dict(width_ratios=[1.2, 1, 1.4]))
 for j, v in enumerate(MODELS):
@@ -250,10 +258,11 @@ lines = [f"Step 6d run {STEP6D_DIR.name}, cell {CELL['name']}, {len(ROWS):,} val
          f"{ROWS.decision_date.nunique()} days of 2023. Drops are AUC(unchanged) - AUC(occluded), 95% day-bootstrap.", ""]
 for v in MODELS:
     t = OCC[v]
-    lines.append(f"**{v}** (AUC on these rows {BASE[v]:.4f})")
+    lines.append(f"**{v}** (on these rows AUC {BASE[v]['auc']:.4f}, log loss {BASE[v]['log_loss']:.4f})")
     for g in ["region (mean fill)", "erase"]:
         for _, r in t[t.group == g].sort_values("drop", ascending=False).iterrows():
-            lines.append(f"- {g}: {r.part}: drop {r['drop']:+.4f} [{r.low:+.4f}, {r.high:+.4f}] {r.verdict}")
+            lines.append(f"- {g}: {r.part}: drop {r['drop']:+.4f} [{r.low:+.4f}, {r.high:+.4f}] {r.verdict}; "
+                         f"log loss {r.log_loss_rise:+.4f} [{r.ll_low:+.4f}, {r.ll_high:+.4f}] {r.ll_verdict}")
     tt = t[t.group.str.startswith("time")]
     top = tt.sort_values("drop", ascending=False).head(3)
     lines.append("- time blocks with the largest drop: " + "; ".join(f"{r.part} {r['drop']:+.4f}" for _, r in top.iterrows()))
