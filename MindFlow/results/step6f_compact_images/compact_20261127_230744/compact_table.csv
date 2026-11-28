@@ -1,4 +1,4 @@
-š‡^model,raw,roc_auc,auc_ci_low,auc_ci_high,log_loss,cell
+model,raw,roc_auc,auc_ci_low,auc_ci_high,log_loss,cell
 "pure_all, a quarter of the height (4x1 max pool)",cmp_quarter,0.6883270197051023,0.6800292966672913,0.6966977294561751,0.6285876439893251,vol_h1
 "6 channels, half height (6 x 117 x 234)",cmp_compact,0.6888887116311566,0.6806302131200869,0.6971740120634081,0.6287618112037289,vol_h1
 strips as 6 channels of 234 x 234,cmp_channels,0.689435514973586,0.6812595988245445,0.6974699524071617,0.6281405491790291,vol_h1
