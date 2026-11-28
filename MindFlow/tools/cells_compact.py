@@ -172,18 +172,19 @@ for i, cell in enumerate(CELLS, 1):
     print(f"elapsed {(time.perf_counter() - t0) / 60:.1f} min")
 """), md("""
 ## 6. Compare on identical rows: AUC and log loss
-AUC with 95% intervals (whole days resampled), log loss, and the paired checks ("better"/"worse" when the 95% interval
-of the difference excludes zero). Step 6d's `pure_all` and Step 6b's scores are for exactly these rows.
+AUC with 95% intervals (whole days resampled), log loss, and the paired checks on both AUC and log loss
+("better"/"worse" when the 95% interval of the difference excludes zero; for log loss, lower is better). Step 6d's `pure_all` and Step 6b's scores are for exactly these rows.
 """), code("""
 SHOW = ["pure_all", "pure_key", "final", "hgb_tab43", "tab_only_rv"]
 def compare(results, n_boot):
-    tables, boots = [], {}
+    tables, boots, ll_boots = [], {}, {}
     for name, r in results.items():
         pred = r["predictions"]
         names = [c[6:] for c in pred.columns if c.startswith("score_") and (c[6:] in SHOW or c.startswith("score_cmp_"))]
         boots[name] = ic.day_bootstrap(pred, names, n_boot)
+        ll_boots[name] = ci.ll_day_bootstrap(pred, names, n_boot)
         tables.append(ci.auc_table(pred, names, boots[name]).assign(cell=name))
-    return pd.concat(tables), ci.checks_table(boots)
+    return pd.concat(tables), ci.checks_table(boots, ll_boots)
 
 TABLE, CHECK = compare(RESULTS, 50 if SMOKE else 300)
 TABLE.to_csv(RUN_DRIVE / "compact_table.csv", index=False)
@@ -246,11 +247,13 @@ for name, r in SUMMARY.iterrows():
                  f"AUC {r.roc_auc:.4f}, log loss {r.log_loss:.4f}, GPU {r.gpu_speedup_vs_6d:.2f}x vs 6d, "
                  f"{r.train_s_per_epoch / 60:.1f} min per epoch")
 for _, r in CHECK.iterrows():
-    lines.append(f"- {r.cell} {r.check}: {r['diff']:+.4f} [{r.low:+.4f}, {r.high:+.4f}] -> {r.verdict}")
+    lines.append(f"- {r.cell} {r.check}: AUC {r['diff']:+.4f} [{r.low:+.4f}, {r.high:+.4f}] -> {r.verdict}; "
+                 f"log loss {r.ll_diff:+.4f} [{r.ll_low:+.4f}, {r.ll_high:+.4f}] -> {r.ll_verdict}")
 TAKEAWAYS = "\\n".join(lines)
 (RUN_DRIVE / "takeaways.md").write_text(TAKEAWAYS + "\\n"); display(Markdown(TAKEAWAYS))
 """), md("""
 ### How to read it
+Read AUC and log loss together: a layout is only "as good" when both are tied.
 - **`quarter` or `compact` tied with `pure_all`**: most of the picture's rows are not needed; the smaller input trains
   and runs faster for the same accuracy.
 - **`channels` better than `pure_all`**: putting price, volatility and volume of one bar in one pixel column helps the

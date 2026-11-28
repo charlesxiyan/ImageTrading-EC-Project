@@ -33,7 +33,7 @@ import indicator_cnn as ic
 import pure_image as pi
 from chartcnn.models import ChartCNN
 
-__version__ = "2026-11-27.1"
+__version__ = "2026-11-28.1"
 
 ROWS = ic.SIZE                    # 234: every channel of the channel pictures
 N_CHANNELS = 6
@@ -232,14 +232,38 @@ def score(variant, prepared, frame, settings, scales, market_close, lrv, numbers
 
 # ----------------------------------------------------------------------------- comparison
 
-def checks_table(boots):
+def ll_day_bootstrap(pred, names, n_boot=300, seed=0):
+    """Log loss draws on the same resampled days as `ic.day_bootstrap` (same seed, so the same day draws)."""
+    from sklearn.metrics import log_loss
+    import pandas as pd
+    rng = np.random.default_rng(seed)
+    y = pred.label.to_numpy()
+    codes, _ = pd.factorize(pred.decision_date)
+    days = [np.flatnonzero(codes == d) for d in range(codes.max() + 1)]
+    cols = {n: np.clip(pred[f"score_{n}"].to_numpy(float), 1e-7, 1 - 1e-7) for n in names}
+    draws = []
+    for _ in range(n_boot):
+        idx = np.concatenate([days[i] for i in rng.integers(0, len(days), len(days))])
+        draws.append({n: log_loss(y[idx], cols[n][idx], labels=[0, 1]) for n in names})
+    return pd.DataFrame(draws)
+
+
+def checks_table(boots, ll_boots=None):
+    """Paired checks: AUC difference (a - b, higher is better) and, given `ll_boots`, log loss difference (a - b,
+    lower is better), each with a 95% paired day-bootstrap interval."""
+    import pandas as pd
     rows = []
     for a, b, label in CHECKS:
         p = ic.paired(boots, a, b)
+        q = ic.paired(ll_boots, a, b).set_index("cell") if ll_boots is not None else None
         for _, r in p.iterrows():
-            rows.append(dict(check=label, a=pretty(a), b=pretty(b), cell=r.cell, diff=r["diff"], low=r.low, high=r.high,
-                             verdict=r.verdict))
-    import pandas as pd
+            row = dict(check=label, a=pretty(a), b=pretty(b), cell=r.cell, diff=r["diff"], low=r.low, high=r.high,
+                       verdict=r.verdict)
+            if q is not None and r.cell in q.index:
+                l = q.loc[r.cell]
+                row.update(ll_diff=l["diff"], ll_low=l.low, ll_high=l.high,
+                           ll_verdict="better" if l.high < 0 else "worse" if l.low > 0 else "tied")
+            rows.append(row)
     return pd.DataFrame(rows)
 
 
