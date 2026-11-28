@@ -1,0 +1,6 @@
+model,label,input,total,lit_share,draw_ms_per_picture_cpu
+pure_all,"pure_all, 466 x 234 (6d)",1x466x234,776450,0.09415428634312756,1.3302113380000264
+cmp_quarter,"pure_all, a quarter of the height (4x1 max pool)",1x116x234,776450,0.12010072207486,1.3908133019999696
+cmp_compact,"6 channels, half height (6 x 117 x 234)",6x117x234,781250,0.1510746584849149,1.7379763740000271
+cmp_channels,strips as 6 channels of 234 x 234,6x234x234,781250,0.14818285362943484,1.6949688299999934
+cmp_filled,pure_all with the empty space filled,1x466x234,776450,0.37638844869960747,2.2574572980000767
